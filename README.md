@@ -1,39 +1,89 @@
 # Clef
 
-TODO: Delete this and the text below, and describe your gem
+Clef is a Ruby gem for score modeling and engraving.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/clef`. To experiment with that code, run `bin/console` for an interactive prompt.
+It provides:
+- Core music domain objects (`Pitch`, `Duration`, `Note`, `Score`)
+- Ruby DSL for writing music textually
+- Rendering pipeline for PDF and SVG output
+- Basic LilyPond parsing and MIDI export
+- Plugin hooks for custom behaviors
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
-
-Install the gem and add to the application's Gemfile by executing:
-
 ```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+bundle add clef
 ```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+## Quick Start
 
-```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+```ruby
+require "clef"
+
+score = Clef.score do
+  title "Twinkle Twinkle"
+  composer "Traditional"
+  tempo beat_unit: :quarter, bpm: 100
+
+  staff :melody, clef: :treble do
+    key :c, :major
+    time 4, 4
+    play "c'4 c'4 g'4 g'4 | a'4 a'4 g'2"
+  end
+end
+
+score.to_pdf("twinkle.pdf")
+score.to_svg("twinkle.svg")
+score.to_midi("twinkle.mid")
 ```
 
-## Usage
+## DSL Reference (Core)
 
-TODO: Write usage instructions here
+```ruby
+Clef.score do
+  title "Example"
+  composer "Composer"
+
+  staff :violin, name: "Violin", clef: :treble do
+    key :g, :major
+    time 4, 4
+
+    voice :main do
+      note "c4", :quarter
+      rest :eighth
+      chord ["c4", "e4", "g4"], :quarter, articulations: [:accent]
+      notes "d'8 e'8 f'4"
+    end
+
+    play "g'4 a'4 b'4 c''4"
+    lyrics :main, "la-la la"
+  end
+end
+```
+
+## Architecture Overview
+
+Pipeline:
+1. DSL / Parser input
+2. Score domain model
+3. Timeline IR (`Clef::Ir::MusicTree`)
+4. Layout (`Spacing`, `LineBreaker`, `PageBreaker`)
+5. Renderer (`PdfRenderer` / `SvgRenderer`)
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+```bash
+bundle install
+bundle exec rspec
+bundle exec rubocop
+```
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+Run examples:
 
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/clef.
+```bash
+bundle exec ruby examples/twinkle.rb
+```
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+MIT License.
