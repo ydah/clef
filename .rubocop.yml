@@ -1,0 +1,118 @@
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+
+Metrics/MethodLength:
+  Max: 20
+
+Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  Enabled: false
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+Gemspec/RequireMFA:
+  Enabled: false
+
+Gemspec/OrderedDependencies:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/LeakyConstantDeclaration:
+  Enabled: false
+
+RSpec/VerifiedDoubleReference:
+  Enabled: false
+
+RSpec/BeNil:
+  Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Enabled: false
+
+Lint/RedundantDirGlobSort:
+  Enabled: false
+
+Lint/AmbiguousOperatorPrecedence:
+  Enabled: false
+
+Lint/SymbolConversion:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 140
+
+Naming/BinaryOperatorParameterName:
+  Enabled: false
+
+Naming/BlockForwarding:
+  Enabled: false
+
+Naming/MethodParameterName:
+  Enabled: false
+
+Style/AccessorGrouping:
+  Enabled: false
+
+Style/ArgumentsForwarding:
+  Enabled: false
+
+Style/BitwisePredicate:
+  Enabled: false
+
+Style/ComparableClamp:
+  Enabled: false
+
+Style/CombinableLoops:
+  Enabled: false
+
+Style/ExplicitBlockArgument:
+  Enabled: false
+
+Style/FloatDivision:
+  Enabled: false
+
+Style/HashEachMethods:
+  Enabled: false
+
+Style/PredicateWithKind:
+  Enabled: false
+
+Style/QuotedSymbols:
+  Enabled: false
+
+Style/RedundantSort:
+  Enabled: false
+
+Style/RegexpLiteral:
+  Enabled: false
+
+Style/SelectByRegexp:
+  Enabled: false
+
+Style/SelfAssignment:
+  Enabled: false
