@@ -33,8 +33,4 @@ Gem::Specification.new do |spec|
   spec.add_dependency "nokogiri", "~> 1.16"
   spec.add_dependency "prawn", "~> 2.4"
   spec.add_dependency "midilib", "~> 4.0"
-
-  spec.add_development_dependency "rspec", "~> 3.13"
-  spec.add_development_dependency "rubocop", "~> 1.60"
-  spec.add_development_dependency "rubocop-rspec", "~> 3.0"
 end
