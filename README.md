@@ -75,7 +75,6 @@ Pipeline:
 ```bash
 bundle install
 bundle exec rspec
-bundle exec rubocop
 ```
 
 Run examples:
