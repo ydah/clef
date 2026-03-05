@@ -33,9 +33,11 @@ module Clef
       # @param baseline [Float]
       def draw_staff(pdf, staff, baseline)
         draw_staff_lines(pdf, baseline)
-        draw_clef(pdf, staff.clef, LEFT_PADDING - 24, baseline)
-        draw_metadata(pdf, staff, LEFT_PADDING + 10, baseline)
-        draw_measures(pdf, staff, LEFT_PADDING + 60, baseline)
+        cursor = draw_clef(pdf, staff.clef, LEFT_PADDING - 24, baseline)
+        cursor += style.staff_space
+        cursor = draw_metadata(pdf, staff, cursor, baseline)
+        cursor += style.staff_space
+        draw_measures(pdf, staff, [cursor, LEFT_PADDING + (style.staff_space * 6)].max, baseline)
       end
 
       # @param pdf [Prawn::Document]
@@ -52,8 +54,12 @@ module Clef
       # @param x [Float]
       # @param baseline [Float]
       def draw_clef(pdf, clef, x, baseline)
-        glyph = smufl_enabled? ? glyph_table[:"clef_#{clef.type}"] : clef.type.to_s.capitalize
-        pdf.text_box(glyph, at: [x, baseline - style.staff_space], size: 16)
+        glyph = smufl_enabled? ? glyph_table[:"clef_#{clef.type}"] : fallback_clef_text(clef)
+        size = smufl_enabled? ? 16 : 10
+        y = smufl_enabled? ? (baseline - style.staff_space) : (baseline + (style.staff_space * 1.5))
+
+        pdf.text_box(glyph, at: [x, y], size: size)
+        x + text_width(pdf, glyph, size: size)
       end
 
       # @param pdf [Prawn::Document]
@@ -61,11 +67,13 @@ module Clef
       # @param x [Float]
       # @param baseline [Float]
       def draw_metadata(pdf, staff, x, baseline)
-        return unless staff.key_signature || staff.time_signature
+        text = metadata_text(staff)
+        return x if text.nil?
 
-        key_text = staff.key_signature ? "#{staff.key_signature.accidentals[:count]}#{staff.key_signature.accidentals[:type]}" : ""
-        time_text = staff.time_signature ? "#{staff.time_signature.numerator}/#{staff.time_signature.denominator}" : ""
-        pdf.text_box([key_text, time_text].reject(&:empty?).join("  "), at: [x, baseline - style.staff_space], size: 11)
+        size = smufl_enabled? ? 11 : 9
+        y = smufl_enabled? ? (baseline - style.staff_space) : (baseline + (style.staff_space * 1.5))
+        pdf.text_box(text, at: [x, y], size: size)
+        x + text_width(pdf, text, size: size)
       end
 
       # @param pdf [Prawn::Document]
@@ -118,9 +126,9 @@ module Clef
       # @param clef [Clef::Core::Clef]
       def draw_note(pdf, note, x, baseline, clef)
         y = pitch_to_y(note.pitch, baseline, clef)
-        draw_notehead(pdf, x, y)
+        draw_notehead(pdf, x, y, duration: note.duration)
         draw_accidental(pdf, note.pitch, x, y)
-        draw_stem(pdf, note, x, y, clef)
+        draw_stem(pdf, note, x, y, clef) if stem_required?(note.duration)
         draw_dot(pdf, note.duration, x, y)
         draw_articulations(pdf, note.articulations, x, y)
       end
@@ -145,16 +153,24 @@ module Clef
       # @param baseline [Float]
       # @param clef [Clef::Core::Clef]
       def draw_chord(pdf, chord, x, baseline, clef)
-        chord.pitches.each { |pitch| draw_notehead(pdf, x, pitch_to_y(pitch, baseline, clef)) }
+        chord.pitches.each { |pitch| draw_notehead(pdf, x, pitch_to_y(pitch, baseline, clef), duration: chord.duration) }
       end
 
       # @param pdf [Prawn::Document]
       # @param x [Float]
       # @param y [Float]
-      def draw_notehead(pdf, x, y)
+      # @param duration [Clef::Core::Duration]
+      def draw_notehead(pdf, x, y, duration:)
         pdf.fill_color("000000")
-        pdf.circle([x, y], 3)
-        pdf.fill
+        if filled_notehead?(duration)
+          pdf.circle([x, y], 3)
+          pdf.fill
+        else
+          pdf.fill_color("FFFFFF")
+          pdf.ellipse([x, y], 3.5, 2.5)
+          pdf.fill_and_stroke
+          pdf.fill_color("000000")
+        end
       end
 
       # @param pdf [Prawn::Document]
@@ -246,10 +262,58 @@ module Clef
         @smufl_enabled
       end
 
+      def fallback_clef_text(clef)
+        {
+          treble: "G",
+          bass: "F",
+          alto: "C",
+          tenor: "C"
+        }.fetch(clef.type, clef.type.to_s[0].upcase)
+      end
+
+      def metadata_text(staff)
+        parts = []
+        key_text = key_signature_text(staff.key_signature)
+        parts << key_text unless key_text.nil?
+        if staff.time_signature
+          parts << "#{staff.time_signature.numerator}/#{staff.time_signature.denominator}"
+        end
+        return nil if parts.empty?
+
+        parts.join(" ")
+      end
+
+      def key_signature_text(key_signature)
+        return nil if key_signature.nil?
+
+        accidentals = key_signature.accidentals
+        count = accidentals[:count].to_i
+        return nil if count.zero?
+
+        symbol = accidentals[:type] == :sharp ? "#" : "b"
+        "#{count}#{symbol}"
+      end
+
+      def text_width(pdf, text, size:)
+        return pdf.width_of(text, size: size) if pdf.respond_to?(:width_of)
+
+        text.length * (size * 0.5)
+      end
+
+      def filled_notehead?(duration)
+        !%i[whole half].include?(duration.base)
+      end
+
+      def stem_required?(duration)
+        duration.base != :whole
+      end
+
       def pitch_to_y(pitch, baseline, clef)
         reference = clef.reference_pitch
         diatonic = diatonic_step(pitch) - diatonic_step(reference)
-        baseline - (style.staff_space / 2.0 * (diatonic - clef.reference_line * 2))
+        top_line = baseline - (style.staff_space * 4)
+        reference_y = top_line + (clef.reference_line * style.staff_space)
+        reference_y - (diatonic * (style.staff_space / 2.0))
       end
 
       def diatonic_step(pitch)
