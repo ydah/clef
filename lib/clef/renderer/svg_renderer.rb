@@ -5,6 +5,8 @@ require "nokogiri"
 module Clef
   module Renderer
     class SvgRenderer < Base
+      include NotationHelpers
+
       WIDTH = 1024
       HEIGHT = 512
 
@@ -50,7 +52,7 @@ module Clef
 
           voice.elements.each do |element|
             draw_element(xml, element, x, baseline, staff.clef)
-            x += style.min_note_spacing * (element.length.to_f / Rational(1, 4).to_f)
+            x += duration_spacing(element)
           end
           x += 16
         end
@@ -63,24 +65,141 @@ module Clef
       # @param clef [Clef::Core::Clef]
       def draw_element(xml, element, x, baseline, clef)
         case element
-        when Clef::Core::Note
-          y = pitch_y(element.pitch, baseline, clef)
-          xml.circle(cx: x, cy: y, r: 3, fill: "black")
-        when Clef::Core::Rest
-          xml.rect(x: x - 2, y: baseline + (style.staff_space * 0.8), width: 5, height: 4, fill: "black")
-        when Clef::Core::Chord
-          element.pitches.each { |pitch| xml.circle(cx: x, cy: pitch_y(pitch, baseline, clef), r: 3, fill: "black") }
+        when Clef::Core::Note then draw_note(xml, element, x, baseline, clef)
+        when Clef::Core::Rest then draw_rest(xml, element, x, baseline)
+        when Clef::Core::Chord then draw_chord(xml, element, x, baseline, clef)
         end
       end
 
       private
 
+      # @param xml [Nokogiri::XML::Builder]
+      # @param note [Clef::Core::Note]
+      # @param x [Float]
+      # @param baseline [Float]
+      # @param clef [Clef::Core::Clef]
+      def draw_note(xml, note, x, baseline, clef)
+        y = pitch_y(note.pitch, baseline, clef)
+        draw_notehead(xml, x, y, duration: note.duration)
+        draw_accidental(xml, note.pitch, x, y)
+        draw_stem(xml, note, x, y, clef) if stem_required?(note.duration)
+        draw_dot(xml, note.duration, x, y)
+        draw_articulations(xml, note.articulations, x, y)
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param rest [Clef::Core::Rest]
+      # @param x [Float]
+      # @param baseline [Float]
+      def draw_rest(xml, rest, x, baseline)
+        if rest.duration.base == :whole
+          xml.rect(x: x - 4, y: baseline + (style.staff_space * 2.8), width: 8, height: 3, fill: "black")
+        else
+          draw_text(xml, "r", x: x - 4, y: baseline + (style.staff_space * 2.1), fill: "black", "font-size": 14)
+        end
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param chord [Clef::Core::Chord]
+      # @param x [Float]
+      # @param baseline [Float]
+      # @param clef [Clef::Core::Clef]
+      def draw_chord(xml, chord, x, baseline, clef)
+        notes = chord_notes(chord)
+        ys = []
+        notes.each do |note|
+          y = pitch_y(note.pitch, baseline, clef)
+          ys << y
+          draw_notehead(xml, x, y, duration: chord.duration)
+          draw_accidental(xml, note.pitch, x, y)
+        end
+        draw_chord_stem(xml, notes, x, ys, clef) if stem_required?(chord.duration)
+        draw_dot(xml, chord.duration, x, ys.sum / ys.length.to_f)
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param x [Float]
+      # @param y [Float]
+      # @param duration [Clef::Core::Duration]
+      def draw_notehead(xml, x, y, duration:)
+        if filled_notehead?(duration)
+          xml.circle(cx: x, cy: y, r: 3, fill: "black")
+        else
+          xml.ellipse(cx: x, cy: y, rx: 3.5, ry: 2.5, fill: "white", stroke: "black", "stroke-width": 1)
+        end
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param note [Clef::Core::Note]
+      # @param x [Float]
+      # @param y [Float]
+      # @param clef [Clef::Core::Clef]
+      def draw_stem(xml, note, x, y, clef)
+        direction = Clef::Layout::Stem.direction(note, clef)
+        stem_len = style.staff_space * Clef::Layout::Stem.length(note, clef, direction)
+        y2 = direction == :up ? y - stem_len : y + stem_len
+        stem_x = direction == :up ? x + 3 : x - 3
+        xml.line(x1: stem_x, y1: y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1)
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param notes [Array<Clef::Core::Note>]
+      # @param x [Float]
+      # @param ys [Array<Float>]
+      # @param clef [Clef::Core::Clef]
+      def draw_chord_stem(xml, notes, x, ys, clef)
+        direction = Clef::Layout::Stem.direction(notes, clef)
+        anchor_note = chord_stem_anchor_note(notes, direction)
+        anchor_index = notes.index(anchor_note)
+        anchor_y = ys[anchor_index]
+        stem_len = style.staff_space * chord_stem_length(notes, clef, direction)
+        y2 = direction == :up ? anchor_y - stem_len : anchor_y + stem_len
+        stem_x = direction == :up ? x + 3 : x - 3
+        xml.line(x1: stem_x, y1: anchor_y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1)
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param pitch [Clef::Core::Pitch]
+      # @param x [Float]
+      # @param y [Float]
+      def draw_accidental(xml, pitch, x, y)
+        key = accidental_glyph_key(pitch.alteration)
+        return unless key
+
+        draw_text(xml, accidental_text(pitch.alteration), x: x - 12, y: y + 3, fill: "black", "font-size": 9)
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param duration [Clef::Core::Duration]
+      # @param x [Float]
+      # @param y [Float]
+      def draw_dot(xml, duration, x, y)
+        return if duration.dots.zero?
+
+        duration.dots.times do |index|
+          xml.circle(cx: x + 8 + (index * 3), cy: y, r: 1, fill: "black")
+        end
+      end
+
+      # @param xml [Nokogiri::XML::Builder]
+      # @param articulations [Array<Symbol>]
+      # @param x [Float]
+      # @param y [Float]
+      def draw_articulations(xml, articulations, x, y)
+        return if articulations.empty?
+
+        draw_text(xml, articulations.join(","), x: x - 4, y: y - 12, fill: "black", "font-size": 6)
+      end
+
       def pitch_y(pitch, baseline, clef)
-        reference = clef.reference_pitch
-        note_names = Clef::Core::Pitch::VALID_NOTE_NAMES
-        pitch_pos = (pitch.octave * 7) + note_names.index(pitch.note_name)
-        ref_pos = (reference.octave * 7) + note_names.index(reference.note_name)
-        baseline + (style.staff_space * 2) - ((pitch_pos - ref_pos) * (style.staff_space / 2.0))
+        calculate_pitch_y(pitch, baseline, clef, vertical_axis: -1)
+      end
+
+      def draw_text(xml, content, **attributes)
+        node = Nokogiri::XML::Node.new("text", xml.doc)
+        attributes.each { |key, value| node[key.to_s] = value.to_s }
+        node.content = content.to_s
+        xml.parent << node
       end
     end
   end

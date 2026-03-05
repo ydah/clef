@@ -5,6 +5,8 @@ require "prawn"
 module Clef
   module Renderer
     class PdfRenderer < Base
+      include NotationHelpers
+
       LEFT_PADDING = 80
       TOP_PADDING = 40
 
@@ -153,7 +155,16 @@ module Clef
       # @param baseline [Float]
       # @param clef [Clef::Core::Clef]
       def draw_chord(pdf, chord, x, baseline, clef)
-        chord.pitches.each { |pitch| draw_notehead(pdf, x, pitch_to_y(pitch, baseline, clef), duration: chord.duration) }
+        notes = chord_notes(chord)
+        ys = []
+        notes.each do |note|
+          y = pitch_to_y(note.pitch, baseline, clef)
+          ys << y
+          draw_notehead(pdf, x, y, duration: chord.duration)
+          draw_accidental(pdf, note.pitch, x, y)
+        end
+        draw_chord_stem(pdf, notes, x, ys, clef) if stem_required?(chord.duration)
+        draw_dot(pdf, chord.duration, x, ys.sum / ys.length.to_f)
       end
 
       # @param pdf [Prawn::Document]
@@ -184,6 +195,22 @@ module Clef
         y2 = direction == :up ? y + stem_len : y - stem_len
         stem_x = direction == :up ? x + 3 : x - 3
         pdf.stroke_line [stem_x, y], [stem_x, y2]
+      end
+
+      # @param pdf [Prawn::Document]
+      # @param notes [Array<Clef::Core::Note>]
+      # @param x [Float]
+      # @param ys [Array<Float>]
+      # @param clef [Clef::Core::Clef]
+      def draw_chord_stem(pdf, notes, x, ys, clef)
+        direction = Clef::Layout::Stem.direction(notes, clef)
+        anchor_note = chord_stem_anchor_note(notes, direction)
+        anchor_index = notes.index(anchor_note)
+        anchor_y = ys[anchor_index]
+        stem_len = style.staff_space * chord_stem_length(notes, clef, direction)
+        y2 = direction == :up ? anchor_y + stem_len : anchor_y - stem_len
+        stem_x = direction == :up ? x + 3 : x - 3
+        pdf.stroke_line [stem_x, anchor_y], [stem_x, y2]
       end
 
       # @param pdf [Prawn::Document]
@@ -300,47 +327,8 @@ module Clef
         text.length * (size * 0.5)
       end
 
-      def filled_notehead?(duration)
-        !%i[whole half].include?(duration.base)
-      end
-
-      def stem_required?(duration)
-        duration.base != :whole
-      end
-
       def pitch_to_y(pitch, baseline, clef)
-        reference = clef.reference_pitch
-        diatonic = diatonic_step(pitch) - diatonic_step(reference)
-        top_line = baseline - (style.staff_space * 4)
-        reference_y = top_line + (clef.reference_line * style.staff_space)
-        reference_y - (diatonic * (style.staff_space / 2.0))
-      end
-
-      def diatonic_step(pitch)
-        note_index = Clef::Core::Pitch::VALID_NOTE_NAMES.index(pitch.note_name)
-        (pitch.octave * 7) + note_index
-      end
-
-      def duration_spacing(element)
-        style.min_note_spacing * (element.length.to_f / Rational(1, 4).to_f)
-      end
-
-      def accidental_glyph_key(alteration)
-        {
-          -2 => :accidental_double_flat,
-          -1 => :accidental_flat,
-          1 => :accidental_sharp,
-          2 => :accidental_double_sharp
-        }[alteration]
-      end
-
-      def accidental_text(alteration)
-        {
-          -2 => "bb",
-          -1 => "b",
-          1 => "#",
-          2 => "##"
-        }.fetch(alteration)
+        calculate_pitch_y(pitch, baseline, clef, vertical_axis: 1)
       end
 
       def staff_right_bound(pdf)
