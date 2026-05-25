@@ -156,6 +156,7 @@ RSpec.describe Clef::Parser::DSL do
 
     tuplet = score.staves.first.measures.first.voices[:default].elements.first
     expect(tuplet.length).to eq(Rational(1, 4))
+    expect(tuplet.elements).to be_frozen
   end
 
   it "supports block argument style" do

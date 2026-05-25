@@ -18,6 +18,7 @@ module Clef
         @normal = normal
         @elements = Array(elements)
         validate_elements!
+        @elements.freeze
       end
 
       # @return [Rational]

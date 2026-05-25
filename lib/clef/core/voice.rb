@@ -5,7 +5,7 @@ module Clef
     class Voice
       ELEMENT_TYPES = [Note, Rest, Chord, Tuplet, Tempo].freeze
 
-      attr_reader :id, :elements
+      attr_reader :id
 
       # @param id [Symbol]
       def initialize(id: :default)
@@ -18,13 +18,18 @@ module Clef
       def add(element)
         raise ArgumentError, "element must be a musical element" unless musical_element?(element)
 
-        elements << element
+        @elements << element
         self
+      end
+
+      # @return [Array<Note, Rest, Chord, Tuplet, Tempo>]
+      def elements
+        @elements.dup.freeze
       end
 
       # @return [Rational]
       def total_length
-        elements.reduce(Rational(0, 1)) { |memo, element| memo + element.length }
+        @elements.reduce(Rational(0, 1)) { |memo, element| memo + element.length }
       end
 
       private
