@@ -3,19 +3,21 @@
 module Clef
   module Layout
     class Spacing
-      attr_reader :timeline, :style, :stretch_factor
+      attr_reader :timeline, :style, :stretch_factor, :extra_moments
 
       # @param timeline [Clef::Ir::Timeline]
       # @param style [Clef::Engraving::Style]
-      def initialize(timeline, style)
+      # @param extra_moments [Array<Clef::Ir::Moment>]
+      def initialize(timeline, style, extra_moments: [])
         @timeline = timeline
         @style = style
+        @extra_moments = extra_moments
         @stretch_factor = 1.0
       end
 
       # @return [Hash{Clef::Ir::Moment=>Float}]
       def compute
-        moments = timeline.each_moment.to_a.sort
+        moments = (timeline.each_moment.to_a + extra_moments).uniq.sort
         return {} if moments.empty?
 
         build_positions(moments)

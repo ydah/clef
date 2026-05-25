@@ -180,6 +180,24 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(document.xpath("//*[@class='slur']").length).to eq(1)
   end
 
+  it "renders constrained scores across multiple systems" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        play Array.new(6, "c'8 d'8 e'8 f'8").join(" | ")
+      end
+    end
+
+    document = nil
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "score.svg")
+      Clef::Compiler.new(score, style: Clef::Engraving::Style.new(line_width: 80)).compile_to_svg(path)
+      document = Nokogiri::XML(File.read(path))
+    end
+
+    expect(document.xpath("//*[@class='clef']").length).to be > 1
+  end
+
   def render_svg_document(score)
     xml = nil
     Dir.mktmpdir do |dir|

@@ -40,7 +40,24 @@ RSpec.describe Clef::Compiler do
     expect(layout[:columns]).not_to be_empty
     expect(layout[:lines]).not_to be_empty
     expect(layout[:pages]).not_to be_empty
+    expect(layout[:systems]).not_to be_empty
+    expect(layout[:items].map(&:type)).to include(:clef, :time_signature, :barline)
     expect(layout[:beams].dig(:melody, 1, :default).first.length).to eq(4)
+  end
+
+  it "builds multiple systems and pages when the style is constrained" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        play Array.new(8, "c'8 d'8 e'8 f'8").join(" | ")
+      end
+    end
+    style = Clef::Engraving::Style.new(line_width: 80, system_gap: 80)
+
+    layout = described_class.new(score, style: style).send(:build_layout)
+
+    expect(layout[:systems].length).to be > 1
+    expect(layout[:pages].length).to be >= 1
   end
 
   it "runs register_glyphs and after-render plugin hooks" do
@@ -67,6 +84,29 @@ RSpec.describe Clef::Compiler do
       described_class.new(simple_score, plugins: registry).compile_to_svg(path)
 
       expect(instance.rendered_path).to eq(path)
+    end
+  end
+
+  it "accepts plugin layout items and renders them in SVG" do
+    plugin = Class.new(Clef::Plugins::Base) do
+      def on_layout_items(_items)
+        [
+          Clef::Layout::Item.new(
+            type: :text,
+            moment: Clef::Ir::Moment.new(0),
+            payload: { text: "plugin mark" }
+          )
+        ]
+      end
+    end
+    registry = Clef::Plugins::Registry.new
+    registry.register(plugin)
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "score.svg")
+      described_class.new(simple_score, plugins: registry).compile_to_svg(path)
+
+      expect(File.read(path)).to include("plugin mark")
     end
   end
 end

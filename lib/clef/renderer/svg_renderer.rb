@@ -18,7 +18,7 @@ module Clef
       # @param positions [Hash]
       # @param _layout [Hash, nil]
       def render(score, path, positions: nil, layout: nil, **_options)
-        height = svg_height(score)
+        height = svg_height(score, layout)
         document = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
           xml.svg(xmlns: "http://www.w3.org/2000/svg",
                   width: WIDTH,
@@ -35,6 +35,8 @@ module Clef
       # @param positions [Hash, nil]
       # @param layout [Hash, nil]
       def draw_score(xml, score, positions: nil, layout: nil)
+        return draw_systems(xml, score, layout) if layout&.dig(:systems)&.any?
+
         draw_header(xml, score)
         staff_index = 0
         score.staff_groups.each do |group|
@@ -44,7 +46,7 @@ module Clef
             draw_staff(xml, staff, baseline, positions: positions, layout: layout)
             staff_index += 1
           end
-          draw_staff_group(xml, group, group_start, staff_index - 1) if group.staves.length > 1
+          draw_staff_group(xml, group, group_start, STAFF_TOP + ((staff_index - 1) * style.staff_gap)) if group.staves.length > 1
         end
       end
 
@@ -94,8 +96,32 @@ module Clef
         draw_lyrics(xml, staff, note_points, baseline)
       end
 
-      def draw_staff_group(xml, group, first_baseline, last_staff_index)
-        last_baseline = STAFF_TOP + (last_staff_index * style.staff_gap)
+      def draw_systems(xml, score, layout)
+        draw_header(xml, score)
+        @system_page_height = svg_page_height_for(score)
+        layout[:systems].each do |system|
+          score.staff_groups.each do |group|
+            baselines = group.staves.map { |staff| svg_system_baseline(system, staff) }
+            group.staves.each do |staff|
+              draw_staff_system(xml, staff, baselines[group.staves.index(staff)], system, layout)
+            end
+            draw_staff_group(xml, group, baselines.first, baselines.last) if group.staves.length > 1
+          end
+          draw_layout_items(xml, layout, system)
+        end
+      end
+
+      def draw_staff_system(xml, staff, baseline, system, layout)
+        draw_staff_lines(xml, baseline)
+        cursor = draw_clef(xml, staff.clef, LEFT_PADDING + 8, baseline)
+        cursor = draw_key_signature(xml, staff.key_signature, cursor + style.staff_space, baseline)
+        cursor = draw_time_signature(xml, staff.time_signature, cursor + style.staff_space, baseline)
+        note_points = draw_measures(xml, staff, [cursor + style.measure_padding, STAFF_START_X].max,
+                                    baseline, layout[:positions], layout, system: system)
+        draw_lyrics(xml, staff, note_points, baseline)
+      end
+
+      def draw_staff_group(xml, group, first_baseline, last_baseline)
         x = LEFT_PADDING - 24
         case group.bracket_type
         when :brace
@@ -107,28 +133,33 @@ module Clef
         end
       end
 
-      def draw_measures(xml, staff, start_x, baseline, positions, layout)
+      def draw_measures(xml, staff, start_x, baseline, positions, layout, system: nil)
         note_points = {}
         measure_start = Clef::Ir::Moment.new(0)
         staff.measures.each do |measure|
-          measure_points = draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout)
+          measure_points = draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout, system: system)
           note_points.merge!(measure_points)
-          bar_x = x_for_moment(positions, measure_start + measure_length_for(measure), start_x)
-          draw_barline(xml, bar_x, baseline)
+          bar_moment = measure_start + measure_length_for(measure)
+          if system.nil? || system.include_moment?(bar_moment)
+            bar_x = x_for_moment(positions, bar_moment, start_x, position_offset: system&.position_offset)
+            draw_barline(xml, bar_x, baseline)
+          end
           measure_start += measure_length_for(measure)
         end
         note_points
       end
 
-      def draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout)
+      def draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout, system: nil)
         note_points = {}
         accidental_state = {}
         measure.voices.each_with_index do |(voice_id, voice), index|
           voice_offset = voice_vertical_offset(index)
           cursor = Clef::Ir::Moment.new(measure_start.value)
           voice.elements.each do |element|
-            x = x_for_moment(positions, cursor, start_x)
-            draw_element_with_context(xml, element, x, baseline + voice_offset, staff, measure, accidental_state, note_points)
+            if system.nil? || system.include_moment?(cursor)
+              x = x_for_moment(positions, cursor, start_x, position_offset: system&.position_offset)
+              draw_element_with_context(xml, element, x, baseline + voice_offset, staff, measure, accidental_state, note_points)
+            end
             cursor += element.length
           end
           draw_beams(xml, layout, staff, measure, voice_id, note_points)
@@ -379,7 +410,7 @@ module Clef
       end
 
       def pitch_y(pitch, baseline, clef)
-        calculate_pitch_y(pitch, baseline, clef, vertical_axis: -1)
+        calculate_pitch_y(pitch, baseline, clef, vertical_axis: drawing_context.vertical_axis)
       end
 
       def draw_text(xml, content, **attributes)
@@ -389,10 +420,10 @@ module Clef
         xml.parent << node
       end
 
-      def x_for_moment(positions, moment, start_x)
+      def x_for_moment(positions, moment, start_x, position_offset: 0.0)
         return start_x unless positions
 
-        start_x + positions.fetch(moment, 0.0)
+        start_x + positions.fetch(moment, position_offset.to_f) - position_offset.to_f
       end
 
       def measure_length_for(measure)
@@ -460,8 +491,35 @@ module Clef
         "#{tempo.beat_unit.to_lilypond} = #{tempo.bpm}"
       end
 
-      def svg_height(score)
-        [STAFF_TOP + (score.staves.length * style.staff_gap) + style.staff_gap, 180].max
+      def svg_height(score, layout)
+        systems = Array(layout&.dig(:systems))
+        return [STAFF_TOP + (score.staves.length * style.staff_gap) + style.staff_gap, 180].max if systems.empty?
+
+        page_count = systems.map(&:page_index).max.to_i + 1
+        [STAFF_TOP + (page_count * svg_page_height_for(score)) + style.system_gap, 180].max
+      end
+
+      def svg_page_height_for(score)
+        STAFF_TOP + (score.staves.length * style.staff_gap) + (style.system_gap * 2)
+      end
+
+      def svg_system_baseline(system, staff)
+        STAFF_TOP + (system.page_index * @system_page_height.to_f) + system.line_top + system.staff_offset(staff.id)
+      end
+
+      def draw_layout_items(xml, layout, system)
+        Array(layout[:items]).each do |item|
+          next unless item.type == :text
+          next unless system.include_moment?(item.moment)
+
+          x = x_for_moment(layout[:positions], item.moment, STAFF_START_X, position_offset: system.position_offset)
+          y = STAFF_TOP + (system.page_index * @system_page_height.to_f) + system.line_top - style.staff_space
+          draw_text(xml, item.payload.fetch(:text), x: x, y: y, class: "layout-item", "font-size": 10, fill: "black")
+        end
+      end
+
+      def drawing_context
+        @drawing_context ||= Clef::Renderer::DrawingContext.svg
       end
 
       def write_output(target, content)

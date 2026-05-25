@@ -30,6 +30,8 @@ module Clef
       # @param positions [Hash, nil]
       # @param layout [Hash, nil]
       def draw_score(pdf, score, positions, layout: nil)
+        return draw_systems(pdf, score, layout) if layout&.dig(:systems)&.any?
+
         draw_header(pdf, score)
         staff_index = 0
         score.staff_groups.each do |group|
@@ -95,13 +97,16 @@ module Clef
       # @param baseline [Float]
       # @param positions [Hash, nil]
       # @param layout [Hash, nil]
-      def draw_measures(pdf, staff, start_x, baseline, positions = nil, layout = nil)
+      def draw_measures(pdf, staff, start_x, baseline, positions = nil, layout = nil, system: nil)
         note_points = {}
         measure_start = Clef::Ir::Moment.new(0)
         staff.measures.each do |measure|
-          note_points.merge!(draw_measure(pdf, measure, staff, start_x, baseline, measure_start, positions, layout))
-          bar_x = x_for_moment(positions, measure_start + measure_length_for(measure), start_x)
-          draw_barline(pdf, bar_x, baseline)
+          note_points.merge!(draw_measure(pdf, measure, staff, start_x, baseline, measure_start, positions, layout, system: system))
+          bar_moment = measure_start + measure_length_for(measure)
+          if system.nil? || system.include_moment?(bar_moment)
+            bar_x = x_for_moment(positions, bar_moment, start_x, position_offset: system&.position_offset)
+            draw_barline(pdf, bar_x, baseline)
+          end
           measure_start += measure_length_for(measure)
         end
         note_points
@@ -116,15 +121,17 @@ module Clef
       # @param positions [Hash, nil]
       # @param layout [Hash, nil]
       # @return [Hash]
-      def draw_measure(pdf, measure, staff, start_x, baseline, measure_start = Clef::Ir::Moment.new(0), positions = nil, layout = nil)
+      def draw_measure(pdf, measure, staff, start_x, baseline, measure_start = Clef::Ir::Moment.new(0), positions = nil, layout = nil, system: nil)
         note_points = {}
         accidental_state = {}
         measure.voices.each_with_index do |(voice_id, voice), index|
           cursor = Clef::Ir::Moment.new(measure_start.value)
           voice_baseline = baseline + voice_vertical_offset(index)
           voice.elements.each do |element|
-            x = x_for_moment(positions, cursor, start_x)
-            draw_element_with_context(pdf, element, x, voice_baseline, staff, measure, accidental_state, note_points)
+            if system.nil? || system.include_moment?(cursor)
+              x = x_for_moment(positions, cursor, start_x, position_offset: system&.position_offset)
+              draw_element_with_context(pdf, element, x, voice_baseline, staff, measure, accidental_state, note_points)
+            end
             cursor += element.length
           end
           draw_beams(pdf, layout, staff, measure, voice_id, note_points)
@@ -326,6 +333,40 @@ module Clef
 
       private
 
+      def draw_systems(pdf, score, layout)
+        draw_header(pdf, score)
+        current_page = 0
+        layout[:systems].each_with_index do |system, index|
+          if index.positive? && system.page_index != current_page
+            pdf.start_new_page
+            current_page = system.page_index
+            draw_header(pdf, score)
+          end
+          score.staff_groups.each do |group|
+            baselines = group.staves.map { |staff| pdf_system_baseline(pdf, system, staff) }
+            group.staves.each do |staff|
+              draw_staff_system(pdf, staff, baselines[group.staves.index(staff)], system, layout)
+            end
+            draw_staff_group_at(pdf, group, baselines.first, baselines.last) if group.staves.length > 1
+          end
+          draw_layout_items(pdf, layout, system)
+        end
+      end
+
+      def draw_staff_system(pdf, staff, baseline, system, layout)
+        draw_staff_lines(pdf, baseline)
+        cursor = draw_clef(pdf, staff.clef, LEFT_PADDING - 24, baseline)
+        cursor = draw_key_signature(pdf, staff.key_signature, cursor + style.staff_space, baseline)
+        cursor = draw_time_signature(pdf, staff.time_signature, cursor + style.staff_space, baseline)
+        note_points = draw_measures(pdf, staff, [cursor + style.measure_padding, STAFF_START_X].max,
+                                    baseline, layout[:positions], layout, system: system)
+        draw_lyrics(pdf, staff, note_points, baseline)
+      end
+
+      def pdf_system_baseline(pdf, system, staff)
+        pdf.bounds.top - TOP_PADDING - system.line_top - system.staff_offset(staff.id)
+      end
+
       def draw_header(pdf, score)
         pdf.text_box(score.title, at: [LEFT_PADDING, pdf.cursor + 18], size: 16) if score.title
         if score.composer
@@ -338,6 +379,10 @@ module Clef
 
       def draw_staff_group(pdf, group, first_baseline, last_staff_index)
         last_baseline = pdf.cursor - TOP_PADDING - (last_staff_index * style.staff_gap)
+        draw_staff_group_at(pdf, group, first_baseline, last_baseline)
+      end
+
+      def draw_staff_group_at(pdf, group, first_baseline, last_baseline)
         x = LEFT_PADDING - 36
         case group.bracket_type
         when :brace
@@ -519,7 +564,7 @@ module Clef
       end
 
       def pitch_to_y(pitch, baseline, clef)
-        calculate_pitch_y(pitch, baseline, clef, vertical_axis: 1)
+        calculate_pitch_y(pitch, baseline, clef, vertical_axis: drawing_context.vertical_axis)
       end
 
       def staff_right_bound(pdf)
@@ -528,10 +573,10 @@ module Clef
         LEFT_PADDING + 500
       end
 
-      def x_for_moment(positions, moment, start_x)
+      def x_for_moment(positions, moment, start_x, position_offset: 0.0)
         return start_x unless positions
 
-        start_x + positions.fetch(moment, 0.0)
+        start_x + positions.fetch(moment, position_offset.to_f) - position_offset.to_f
       end
 
       def measure_length_for(measure)
@@ -582,6 +627,21 @@ module Clef
 
       def tempo_text(tempo)
         "#{tempo.beat_unit.to_lilypond} = #{tempo.bpm}"
+      end
+
+      def draw_layout_items(pdf, layout, system)
+        Array(layout[:items]).each do |item|
+          next unless item.type == :text
+          next unless system.include_moment?(item.moment)
+
+          x = x_for_moment(layout[:positions], item.moment, STAFF_START_X, position_offset: system.position_offset)
+          y = pdf.bounds.top - TOP_PADDING - system.line_top + style.staff_space
+          pdf.text_box(item.payload.fetch(:text), at: [x, y], size: 8)
+        end
+      end
+
+      def drawing_context
+        @drawing_context ||= Clef::Renderer::DrawingContext.pdf
       end
 
       def render_to_io(score, io, positions:, layout:)

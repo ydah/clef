@@ -16,6 +16,9 @@ module Clef
       # @param _layout_result [Hash]
       def on_after_layout(_layout_result); end
 
+      # @param _items [Array<Clef::Layout::Item>]
+      def on_layout_items(_items); end
+
       # @param _renderer [Object]
       def on_before_render(_renderer); end
 
