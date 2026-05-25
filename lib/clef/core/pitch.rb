@@ -51,9 +51,9 @@ module Clef
         10 => [:b, -1],
         11 => [:b, 0]
       }.freeze
-      SCIENTIFIC_PITCH_REGEX = /\A([A-Ga-g])([#b]{0,2})(-?\d+)\z/.freeze
-      LILYPOND_PITCH_REGEX = /\A([a-g])(eses|isis|es|is)?([',]*)\z/.freeze
-      MIDI_RANGE = (0..127).freeze
+      SCIENTIFIC_PITCH_REGEX = /\A([A-Ga-g])([#b]{0,2})(-?\d+)\z/
+      LILYPOND_PITCH_REGEX = /\A([a-g])(eses|isis|es|is)?([',]*)\z/
+      MIDI_RANGE = (0..127)
 
       attr_reader :note_name, :octave, :alteration
 
@@ -98,7 +98,7 @@ module Clef
         raise RangeError, "MIDI pitch out of range: #{target_midi}" unless MIDI_RANGE.cover?(target_midi)
 
         octave = (target_midi / 12) - 1
-        pitch_map = prefer == :flat ? MIDI_CLASS_TO_FLAT_PITCH : MIDI_CLASS_TO_PITCH
+        pitch_map = (prefer == :flat) ? MIDI_CLASS_TO_FLAT_PITCH : MIDI_CLASS_TO_PITCH
         note_name, alteration = pitch_map.fetch(target_midi % 12)
         self.class.new(note_name, octave, alteration: alteration)
       end
@@ -145,7 +145,7 @@ module Clef
         raise ArgumentError, "invalid scientific pitch: #{str}" unless match
 
         note_name = match[1].downcase.to_sym
-        alteration = { "" => 0, "#" => 1, "##" => 2, "b" => -1, "bb" => -2 }.fetch(match[2])
+        alteration = {"" => 0, "#" => 1, "##" => 2, "b" => -1, "bb" => -2}.fetch(match[2])
         new(note_name, match[3].to_i, alteration: alteration)
       end
 

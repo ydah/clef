@@ -9,8 +9,8 @@ module Clef
       # @param glyph_table [Clef::Engraving::GlyphTable]
       # @param font_manager [Clef::Engraving::FontManager]
       def initialize(style: Clef::Engraving::Style.default,
-                     glyph_table: Clef::Engraving::GlyphTable.new,
-                     font_manager: Clef::Engraving::FontManager.new)
+        glyph_table: Clef::Engraving::GlyphTable.new,
+        font_manager: Clef::Engraving::FontManager.new)
         @style = style
         @glyph_table = glyph_table
         @font_manager = font_manager

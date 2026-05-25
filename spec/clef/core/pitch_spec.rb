@@ -57,7 +57,7 @@ RSpec.describe Clef::Core::Pitch do
       d_flat = described_class.new(:d, 4, alteration: -1)
 
       expect(c4).to be < d4
-      expect([d4, c_sharp, d_flat].sort.first).to eq(c_sharp)
+      expect([d4, c_sharp, d_flat].min).to eq(c_sharp)
     end
   end
 
@@ -67,6 +67,14 @@ RSpec.describe Clef::Core::Pitch do
       parsed = described_class.parse(original.to_lilypond)
 
       expect(parsed).to eq(original)
+    end
+
+    it "roundtrips supported lilypond spellings across octaves" do
+      described_class::VALID_NOTE_NAMES.product((-2..2).to_a, (1..6).to_a).each do |note_name, alteration, octave|
+        pitch = described_class.new(note_name, octave, alteration: alteration)
+
+        expect(described_class.parse(pitch.to_lilypond)).to eq(pitch)
+      end
     end
 
     it "parses sample notation" do

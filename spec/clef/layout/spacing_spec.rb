@@ -9,7 +9,7 @@ RSpec.describe Clef::Layout::Spacing do
     durations.each do |duration|
       note = Clef::Core::Note.new(Clef::Core::Pitch.new(:c, 4), duration)
       timeline.add(Clef::Ir::Event.new(moment: cursor, element: note, staff_id: :s, voice_id: :v))
-      cursor = cursor + duration.length
+      cursor += duration.length
     end
     timeline
   end

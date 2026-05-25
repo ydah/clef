@@ -191,7 +191,7 @@ module Clef
           ids = measure.overflowing_voice_ids
           return if ids.empty?
 
-          raise Error, "measure #{measure.number} voice #{ids.join(', ')} exceeds time signature length"
+          raise Error, "measure #{measure.number} voice #{ids.join(", ")} exceeds time signature length"
         end
       end
 
@@ -286,7 +286,7 @@ module Clef
           else
             add_note_token(token)
           end
-        rescue StandardError => e
+        rescue => e
           raise Error, "failed to parse token '#{token}': #{e.message}"
         end
 
@@ -319,8 +319,8 @@ module Clef
           pitch = parse_pitch(match[1])
           duration = duration_from_match(match[2], match[3])
           note = Clef::Core::Note.new(pitch, duration,
-                                      articulations: consume_articulations,
-                                      tied: consume_tie_state)
+            articulations: consume_articulations,
+            tied: consume_tie_state)
           note.slur_start = consume_slur_start
           note.beam_start = consume_beam_start
           @voice.add(note)
@@ -334,10 +334,10 @@ module Clef
 
         def duration_from_match(number, dots)
           duration = if number.empty?
-                       @last_duration
-                     else
-                       Clef::Core::Duration.from_lilypond(number.to_i, dots.length)
-                     end
+            @last_duration
+          else
+            Clef::Core::Duration.from_lilypond(number.to_i, dots.length)
+          end
           @last_duration = duration
           duration
         end
@@ -351,7 +351,7 @@ module Clef
         def split_articulation_suffixes(token)
           articulations = []
           loop do
-            suffix = { "-." => :staccato, "->" => :accent, "--" => :tenuto }.find { |marker, _| token.end_with?(marker) }
+            suffix = {"-." => :staccato, "->" => :accent, "--" => :tenuto}.find { |marker, _| token.end_with?(marker) }
             break unless suffix
 
             marker, articulation = suffix
@@ -366,7 +366,7 @@ module Clef
         end
 
         def add_pending_articulation(token)
-          articulation = { "-." => :staccato, "->" => :accent, "--" => :tenuto }.fetch(token)
+          articulation = {"-." => :staccato, "->" => :accent, "--" => :tenuto}.fetch(token)
           if @last_note
             @last_note.articulations << articulation
           else

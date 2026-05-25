@@ -13,8 +13,8 @@ RSpec.describe Clef::Layout::SystemLayout do
         play "c1"
       end
     end
-    positions = { Clef::Ir::Moment.new(0) => 0.0, Clef::Ir::Moment.new(1) => 100.0 }
-    line = [{ moment: Clef::Ir::Moment.new(0), width: 100.0 }, { moment: Clef::Ir::Moment.new(1), width: 24.0 }]
+    positions = {Clef::Ir::Moment.new(0) => 0.0, Clef::Ir::Moment.new(1) => 100.0}
+    line = [{moment: Clef::Ir::Moment.new(0), width: 100.0}, {moment: Clef::Ir::Moment.new(1), width: 24.0}]
 
     systems = described_class.new(
       score,

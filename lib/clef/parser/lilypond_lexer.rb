@@ -21,12 +21,12 @@ module Clef
         \\[a-zA-Z]+ |
         << | >> |
         \{\} | \{ | \} |
-        <[^>]+>\d*\.*[~]? |
-        [a-g](?:isis|eses|is|es)?[',]*\d*\.*[~]? |
+        <[^>]+>\d*\.*~? |
+        [a-g](?:isis|eses|is|es)?[',]*\d*\.*~? |
         r\d*\.* |
         -- | -> | -\. |
         [~()\[\]|]
-      /mx.freeze
+      /mx
 
       # @param input [String]
       # @return [Array<String>]

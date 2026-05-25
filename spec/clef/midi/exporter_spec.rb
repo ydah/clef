@@ -47,7 +47,7 @@ RSpec.describe Clef::Midi::Exporter do
       end
     end
 
-    sequence = export_sequence(score, ppqn: 960, instrument_map: { melody: 40 })
+    sequence = export_sequence(score, ppqn: 960, instrument_map: {melody: 40})
     tempo = sequence.tracks[0].events.find { |event| event.is_a?(MIDI::Tempo) }
     program = sequence.tracks[1].events.find { |event| event.is_a?(MIDI::ProgramChange) }
 
@@ -105,6 +105,29 @@ RSpec.describe Clef::Midi::Exporter do
     ])
     expect(tempos.map(&:delta_time)).to eq([0, 480])
     expect(note_ons.map(&:velocity)).to eq([48, 96])
+  end
+
+  it "preserves rest-only and empty measure duration with track end deltas" do
+    rest_score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice { rest :whole }
+      end
+    end
+    empty_score = Clef.score do
+      staff :melody do
+        time 4, 4
+        measure {}
+      end
+    end
+
+    rest_track_end = export_sequence(rest_score).tracks[1].events.last
+    empty_track_end = export_sequence(empty_score).tracks[1].events.last
+
+    expect(rest_track_end.meta_type).to eq(MIDI::META_TRACK_END)
+    expect(empty_track_end.meta_type).to eq(MIDI::META_TRACK_END)
+    expect(rest_track_end.delta_time).to eq(1920)
+    expect(empty_track_end.delta_time).to eq(1920)
   end
 
   it "writes to IO objects and validates missing output directories" do

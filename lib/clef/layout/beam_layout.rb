@@ -20,8 +20,8 @@ module Clef
         def compute(beam_group, _clef, _spacing)
           first_y = pitch_y(beam_group.first.pitch)
           last_y = pitch_y(beam_group.last.pitch)
-          slope = [[(last_y - first_y) / [beam_group.length - 1, 1].max, -0.5].max, 0.5].min
-          { start_y: first_y, end_y: first_y + slope * (beam_group.length - 1), slope: slope }
+          slope = ((last_y - first_y) / [beam_group.length - 1, 1].max).clamp(-0.5, 0.5)
+          {start_y: first_y, end_y: first_y + slope * (beam_group.length - 1), slope: slope}
         end
 
         private

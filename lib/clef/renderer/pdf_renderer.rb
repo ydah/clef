@@ -180,10 +180,10 @@ module Clef
         return if rest.kind == :invisible || rest.kind == :spacer
 
         glyph = if smufl_enabled?
-                  glyph_table[:"rest_#{rest.duration.base}"] || glyph_table[:rest_quarter]
-                else
-                  rest_label(rest.duration)
-                end
+          glyph_table[:"rest_#{rest.duration.base}"] || glyph_table[:rest_quarter]
+        else
+          rest_label(rest.duration)
+        end
         pdf.text_box(glyph, at: [x, rest_y(rest, baseline)], size: 14)
       end
 
@@ -249,8 +249,8 @@ module Clef
       def draw_stem(pdf, note, x, y, clef)
         direction = Clef::Layout::Stem.direction(note, clef)
         stem_len = style.staff_space * Clef::Layout::Stem.length(note, clef, direction)
-        y2 = direction == :up ? y + stem_len : y - stem_len
-        stem_x = direction == :up ? x + 3 : x - 3
+        y2 = (direction == :up) ? y + stem_len : y - stem_len
+        stem_x = (direction == :up) ? x + 3 : x - 3
         pdf.stroke_line [stem_x, y], [stem_x, y2]
       end
 
@@ -265,8 +265,8 @@ module Clef
         anchor_index = notes.index(anchor_note)
         anchor_y = ys[anchor_index]
         stem_len = style.staff_space * chord_stem_length(notes, clef, direction)
-        y2 = direction == :up ? anchor_y + stem_len : anchor_y - stem_len
-        stem_x = direction == :up ? x + 3 : x - 3
+        y2 = (direction == :up) ? anchor_y + stem_len : anchor_y - stem_len
+        stem_x = (direction == :up) ? x + 3 : x - 3
         pdf.stroke_line [stem_x, anchor_y], [stem_x, y2]
       end
 
@@ -328,10 +328,11 @@ module Clef
       end
 
       # Compatibility extension points; concrete drawing now happens during measure rendering.
-      def draw_slurs(_pdf, _slurs = []); end
-      def draw_ties(_pdf, _ties = []); end
-      def draw_beams(_pdf, *_args); end
-      def draw_lyrics(_pdf, *_args); end
+      def draw_slurs(_pdf, _slurs = [])
+      end
+
+      def draw_ties(_pdf, _ties = [])
+      end
 
       private
 
@@ -361,7 +362,7 @@ module Clef
         cursor = draw_key_signature(pdf, staff.key_signature, cursor + style.staff_space, baseline)
         cursor = draw_time_signature(pdf, staff.time_signature, cursor + style.staff_space, baseline)
         note_points = draw_measures(pdf, staff, [cursor + style.measure_padding, STAFF_START_X].max,
-                                    baseline, layout[:positions], layout, system: system)
+          baseline, layout[:positions], layout, system: system)
         draw_lyrics(pdf, staff, note_points, baseline)
       end
 
@@ -400,20 +401,20 @@ module Clef
         case element
         when Clef::Core::Note
           draw_note(pdf, element, x, baseline, staff.clef,
-                    accidental_state: accidental_state,
-                    key_signature: measure.key_signature || staff.key_signature)
+            accidental_state: accidental_state,
+            key_signature: measure.key_signature || staff.key_signature)
           note_points[element.object_id] = [x, pitch_to_y(element.pitch, baseline, staff.clef)]
         when Clef::Core::Rest
           draw_rest(pdf, element, x, baseline)
         when Clef::Core::Chord
           draw_chord(pdf, element, x, baseline, staff.clef,
-                     accidental_state: accidental_state,
-                     key_signature: measure.key_signature || staff.key_signature)
+            accidental_state: accidental_state,
+            key_signature: measure.key_signature || staff.key_signature)
         when Clef::Core::Tuplet
           draw_tuplet(pdf, element, x, baseline, staff.clef,
-                      accidental_state: accidental_state,
-                      key_signature: measure.key_signature || staff.key_signature,
-                      note_points: note_points)
+            accidental_state: accidental_state,
+            key_signature: measure.key_signature || staff.key_signature,
+            note_points: note_points)
         when Clef::Notation::Dynamic
           draw_dynamic(pdf, element, x, baseline)
         when Clef::Core::Tempo
@@ -432,9 +433,9 @@ module Clef
       def draw_flag(pdf, note, x, y, clef)
         direction = Clef::Layout::Stem.direction(note, clef)
         stem_len = style.staff_space * Clef::Layout::Stem.length(note, clef, direction)
-        stem_x = direction == :up ? x + 3 : x - 3
-        stem_y = direction == :up ? y + stem_len : y - stem_len
-        sweep = direction == :up ? -8 : 8
+        stem_x = (direction == :up) ? x + 3 : x - 3
+        stem_y = (direction == :up) ? y + stem_len : y - stem_len
+        sweep = (direction == :up) ? -8 : 8
         pdf.stroke_line [stem_x, stem_y], [stem_x + 8, stem_y + sweep]
       end
 
@@ -460,19 +461,19 @@ module Clef
       end
 
       def draw_connection_to_next(pdf, note, candidates, note_points, kind)
-        target = kind == :tie ? candidates&.find { |candidate| candidate.pitch.enharmonic?(note.pitch) } : candidates&.find(&:slur_end)
+        target = (kind == :tie) ? candidates&.find { |candidate| candidate.pitch.enharmonic?(note.pitch) } : candidates&.find(&:slur_end)
         return unless target
 
         start_point = note_points[note.object_id]
         end_point = note_points[target.object_id]
         return unless start_point && end_point
 
-        lift = kind == :tie ? 8 : 14
+        lift = (kind == :tie) ? 8 : 14
         if pdf.respond_to?(:stroke_curve)
           pdf.stroke_curve [start_point[0] + 5, start_point[1] + 5],
-                           [end_point[0] - 5, end_point[1] + 5],
-                           bounds: [[start_point[0] + 18, start_point[1] + lift],
-                                    [end_point[0] - 18, end_point[1] + lift]]
+            [end_point[0] - 5, end_point[1] + 5],
+            bounds: [[start_point[0] + 18, start_point[1] + lift],
+              [end_point[0] - 18, end_point[1] + lift]]
         else
           pdf.stroke_line [start_point[0] + 5, start_point[1] + 5], [end_point[0] - 5, end_point[1] + 5]
         end
@@ -481,7 +482,7 @@ module Clef
       def draw_lyrics(pdf, staff, note_points, baseline)
         Array(staff.metadata[:lyrics]).each do |lyric|
           notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
-                      .select { |element| element.is_a?(Clef::Core::Note) }
+            .select { |element| element.is_a?(Clef::Core::Note) }
           lyric.syllables.zip(notes).each do |syllable, note|
             point = note_points[note.object_id]
             next unless syllable && point
@@ -494,12 +495,12 @@ module Clef
       def draw_ledger_lines(pdf, x, y, baseline)
         top = baseline
         bottom = baseline - (style.staff_space * 4)
-        return if y <= top && y >= bottom
+        return if y.between?(bottom, top)
 
-        current = y > top ? top + style.staff_space : bottom - style.staff_space
-        while y > top ? current <= y : current >= y
+        current = (y > top) ? top + style.staff_space : bottom - style.staff_space
+        while (y > top) ? current <= y : current >= y
           pdf.stroke_line [x - 6, current], [x + 6, current]
-          current += y > top ? style.staff_space : -style.staff_space
+          current += (y > top) ? style.staff_space : -style.staff_space
         end
       end
 
@@ -507,8 +508,8 @@ module Clef
         return x unless key_signature
 
         accidentals = key_signature.accidentals
-        order = accidentals[:type] == :sharp ? NotationHelpers::SHARP_ORDER : NotationHelpers::FLAT_ORDER
-        text = accidentals[:type] == :sharp ? "#" : "b"
+        order = (accidentals[:type] == :sharp) ? NotationHelpers::SHARP_ORDER : NotationHelpers::FLAT_ORDER
+        text = (accidentals[:type] == :sharp) ? "#" : "b"
         order.first(accidentals[:count].to_i).each_with_index do |note_name, index|
           y = baseline - key_signature_y(note_name)
           pdf.text_box(text, at: [x + (index * 8), y], size: 10)
@@ -528,7 +529,7 @@ module Clef
         font_name = font_manager.register_with(pdf)
         pdf.font(font_name)
         @smufl_enabled = (font_name != "Helvetica")
-      rescue StandardError
+      rescue
         pdf.font("Helvetica")
         @smufl_enabled = false
       end
@@ -567,7 +568,7 @@ module Clef
         count = accidentals[:count].to_i
         return nil if count.zero?
 
-        symbol = accidentals[:type] == :sharp ? "#" : "b"
+        symbol = (accidentals[:type] == :sharp) ? "#" : "b"
         "#{count}#{symbol}"
       end
 
@@ -631,7 +632,7 @@ module Clef
       def chord_note_offsets(notes)
         notes.each_with_index.map do |note, index|
           previous = notes[index - 1]
-          previous && (diatonic_step(note.pitch) - diatonic_step(previous.pitch)).abs == 1 ? 6 : 0
+          (previous && (diatonic_step(note.pitch) - diatonic_step(previous.pitch)).abs == 1) ? 6 : 0
         end
       end
 

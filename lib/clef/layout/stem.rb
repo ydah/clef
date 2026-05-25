@@ -11,7 +11,7 @@ module Clef
           notes = Array(note_or_notes)
           middle = diatonic_step(clef.reference_pitch)
           down_votes = notes.count { |note| diatonic_step(note.pitch) > middle }
-          down_votes > (notes.length / 2.0) ? :down : :up
+          (down_votes > (notes.length / 2.0)) ? :down : :up
         end
 
         # @param note [Clef::Core::Note]

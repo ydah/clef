@@ -1,21 +1,21 @@
 # frozen_string_literal: true
 
-RSpec.describe Clef::Plugins::Registry do
-  class DummyPlugin < Clef::Plugins::Base
-    def self.plugin_name
-      "dummy"
-    end
-
-    def on_before_layout(score)
-      score.metadata[:hooked] = true
-    end
+class RegistrySpecDummyPlugin < Clef::Plugins::Base
+  def self.plugin_name
+    "dummy"
   end
 
+  def on_before_layout(score)
+    score.metadata[:hooked] = true
+  end
+end
+
+RSpec.describe Clef::Plugins::Registry do
   it "registers plugins and runs hooks" do
     registry = described_class.new
     score = Clef::Core::Score.new
 
-    registry.register(DummyPlugin)
+    registry.register(RegistrySpecDummyPlugin)
     registry.run_hook(:on_before_layout, score)
 
     expect(score.metadata[:hooked]).to be(true)
@@ -23,15 +23,15 @@ RSpec.describe Clef::Plugins::Registry do
 
   it "registers plugin instances and can unregister or clear them" do
     registry = described_class.new
-    plugin = DummyPlugin.new
+    plugin = RegistrySpecDummyPlugin.new
 
     registry.register(plugin)
     expect(registry.plugins).to eq([plugin])
 
-    expect(registry.unregister(DummyPlugin)).to eq(plugin)
+    expect(registry.unregister(RegistrySpecDummyPlugin)).to eq(plugin)
     expect(registry.plugins).to be_empty
 
-    registry.register(DummyPlugin)
+    registry.register(RegistrySpecDummyPlugin)
     registry.clear
     expect(registry.plugins).to be_empty
   end

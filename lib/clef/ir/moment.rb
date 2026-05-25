@@ -16,8 +16,8 @@ module Clef
 
       # @param duration [Rational, #length]
       # @return [Moment]
-      def +(duration)
-        self.class.new(value + normalize_duration(duration))
+      def +(other)
+        self.class.new(value + normalize_duration(other))
       end
 
       # @param other [Moment, Rational, Integer]

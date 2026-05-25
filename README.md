@@ -64,6 +64,8 @@ Clef's main entry point is `Clef.score`.
 - `play` and `notes` inherit the previous duration for tokens such as `c'4 d' e' f'`
 - `play` and `notes` read a small set of ties, articulations, slurs, and beam hints
 - `voice` gives explicit control over notes, rests, and chords
+- `dynamic` adds velocity/rendering markings such as `:p`, `:mf`, and `:f`
+- voice-level `tempo` adds playback and rendering tempo changes
 - `tuplet(actual, normal)` groups notes with scaled duration
 - `measure` and `bar` give explicit measure control in manual DSL
 - `lyrics` attaches lyric data to a named voice
@@ -120,7 +122,8 @@ The current parser recognizes:
 - `\time`
 - `\tempo`
 - a small `\relative` subset
-- Note, rest, chord, and bar tokens inside `{ ... }`
+- `\new Staff`, `\new StaffGroup`, and simple simultaneous voices
+- Note, rest, chord, dynamic, and bar tokens inside `{ ... }`
 
 Unsupported commands are recorded in `parser.warnings`.
 
@@ -152,7 +155,7 @@ Registries support `register`, `unregister`, `clear`, plugin instances, initiali
 
 ## Current Scope
 
-- PDF and SVG rendering cover score headers, clefs, key and time metadata, noteheads, rests, stems, flags, simple beams, accidentals, natural signs, dots, chords, articulations, lyrics, ties, slurs, and staff-group braces/brackets.
+- PDF and SVG rendering cover score headers, clefs, key and time metadata, tempo changes, dynamics, noteheads, rests, stems, flags, simple beams, accidentals, natural signs, dots, chords, articulations, lyrics, ties, slurs, and staff-group braces/brackets.
 - PDF, SVG, and MIDI consume all voices in each measure. Engraving is intentionally lightweight and suited to small scores rather than full publishing-grade polyphony.
 - The compiler computes `Clef::Ir::MusicTree`, spacing, line breaks, page breaks, and beam groups before rendering.
 - Validation reports measure overflow errors, underfull warnings, lyric/note count mismatches, duplicate IDs, and MIDI pitch range errors.
@@ -172,7 +175,7 @@ bundle exec rspec
 bundle exec rake
 ```
 
-The default `rake` task runs specs, Ruby syntax lint, and a gem build smoke test.
+The default `rake` task runs specs with SimpleCov, Standard Ruby lint, Ruby syntax checks, and a gem build smoke test.
 
 Run an example:
 
@@ -186,7 +189,7 @@ Open a console:
 bin/console
 ```
 
-Run the minimal executable on a Ruby file that evaluates to a `Clef::Core::Score`:
+Run the minimal executable on a Ruby file that calls `Clef.score`; the CLI exports the last score built:
 
 ```bash
 bundle exec ruby exe/clef path/to/score.rb score.svg

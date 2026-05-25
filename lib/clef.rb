@@ -57,14 +57,16 @@ module Clef
   class Error < StandardError; end
 
   class << self
+    attr_reader :last_score
+
     # @yield DSL block
     # @return [Clef::Core::Score]
     def score(plugins: Clef.plugins, &block)
       builder = Clef::Parser::DSL::ScoreBuilder.new(plugins: plugins)
       if block
-        block.arity == 1 ? block.call(builder) : builder.instance_eval(&block)
+        (block.arity == 1) ? block.call(builder) : builder.instance_eval(&block)
       end
-      builder.build
+      @last_score = builder.build
     end
 
     # @return [Clef::Plugins::Registry]

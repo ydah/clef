@@ -62,7 +62,7 @@ module Clef
 
       # @return [String]
       def to_lilypond
-        "#{BASE_TO_NUMBER.fetch(base)}#{'.' * dots}"
+        "#{BASE_TO_NUMBER.fetch(base)}#{"." * dots}"
       end
 
       # @param number [Integer]

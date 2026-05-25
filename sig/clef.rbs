@@ -1,0 +1,43 @@
+module Clef
+  VERSION: String
+
+  def self.score: (?plugins: Plugins::Registry) { (Parser::DSL::ScoreBuilder) -> void } -> Core::Score
+                | (?plugins: Plugins::Registry) { () -> void } -> Core::Score
+                | (?plugins: Plugins::Registry) -> Core::Score
+  def self.last_score: () -> Core::Score?
+  def self.plugins: () -> Plugins::Registry
+
+  class Error < StandardError
+  end
+
+  module Core
+    class Score
+      attr_accessor title: String?
+      attr_accessor composer: String?
+      attr_accessor tempo: Tempo?
+
+      def to_pdf: (untyped path, **untyped options) -> untyped
+      def to_svg: (untyped path, **untyped options) -> untyped
+      def to_midi: (untyped path, **untyped options) -> untyped
+      def to_format: (untyped path, **untyped options) -> untyped
+      def validate: (?strict: bool) -> ValidationResult
+    end
+
+    class Pitch
+      def self.parse: (String str) -> Pitch
+      def self.parse_scientific: (String str) -> Pitch
+      def self.parse_any: (String | Symbol | Pitch value) -> Pitch
+
+      def to_lilypond: () -> String
+      def to_midi: () -> Integer
+      def transpose: (Integer semitones, ?prefer: Symbol) -> Pitch
+    end
+
+    class Duration
+      def self.from_lilypond: (Integer number, ?Integer dots) -> Duration
+
+      def length: () -> Rational
+      def to_lilypond: () -> String
+    end
+  end
+end

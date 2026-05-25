@@ -10,7 +10,7 @@ RSpec.describe Clef::Core::Staff do
   end
 
   it "duplicates assigned metadata hashes" do
-    source = { instrument: "Piano" }
+    source = {instrument: "Piano"}
     staff = described_class.new(:piano)
     staff.metadata = source
     source[:instrument] = "Violin"

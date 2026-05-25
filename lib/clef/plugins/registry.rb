@@ -29,7 +29,7 @@ module Clef
       # @return [Plugins::Base]
       def register(plugin_or_class, *args, priority: 0, **kwargs)
         plugin = build_plugin(plugin_or_class, *args, **kwargs)
-        @entries << { plugin: plugin, priority: priority, order: @next_order }
+        @entries << {plugin: plugin, priority: priority, order: @next_order}
         @next_order += 1
         @entries.sort_by! { |entry| [entry[:priority], entry[:order]] }
         plugin
@@ -83,7 +83,7 @@ module Clef
 
       def run_plugin_hook(plugin, hook_name, args)
         plugin.public_send(hook_name, *args)
-      rescue StandardError => e
+      rescue => e
         handle_hook_error(plugin, hook_name, e)
       end
 
@@ -95,7 +95,7 @@ module Clef
           warn("Clef plugin #{plugin.class.plugin_name} #{hook_name} failed: #{error.message}")
           nil
         when :collect
-          errors << { plugin: plugin, hook: hook_name, error: error }
+          errors << {plugin: plugin, hook: hook_name, error: error}
           nil
         end
       end

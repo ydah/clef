@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+require "simplecov"
+
+SimpleCov.start do
+  add_filter "/spec/"
+end
+
 require "clef"
 
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |file| require file }

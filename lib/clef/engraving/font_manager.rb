@@ -21,7 +21,7 @@ module Clef
       def register_with(pdf, family_name: "Bravura")
         return "Helvetica" unless font_available?
 
-        pdf.font_families.update(family_name => { normal: font_path })
+        pdf.font_families.update(family_name => {normal: font_path})
         family_name
       end
 

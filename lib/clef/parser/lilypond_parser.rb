@@ -5,7 +5,7 @@ module Clef
     class LilypondParser
       SUPPORTED_COMMANDS = %w[\\clef \\key \\major \\minor \\time \\tempo \\relative \\new \\with].freeze
       DYNAMIC_COMMANDS = Clef::Notation::Dynamic::TYPES.map { |type| "\\#{type}" }.freeze
-      STAFF_COMMAND = /\\new\s+(?:Staff|PianoStaff|StaffGroup)/.freeze
+      STAFF_COMMAND = /\\new\s+(?:Staff|PianoStaff|StaffGroup)/
 
       attr_reader :warnings, :plugins
 
@@ -94,7 +94,7 @@ module Clef
 
           body, body_end = braced_body_at(input, brace_start)
           header = input[command_start...brace_start]
-          blocks << { header: header, body: body }
+          blocks << {header: header, body: body}
           scanner_index = body_end + 1
         end
         blocks
@@ -107,12 +107,12 @@ module Clef
       def extract_voice_streams(body, context: body)
         simultaneous = first_simultaneous_body(body)
         streams = if simultaneous
-                    braced_bodies(simultaneous)
-                  elsif (inner = braced_bodies(body).first)
-                    [inner]
-                  else
-                    [body]
-                  end
+          braced_bodies(simultaneous)
+        elsif (inner = braced_bodies(body).first)
+          [inner]
+        else
+          [body]
+        end
         streams.map { |stream| note_stream(stream, context: context) }.reject(&:empty?)
       end
 

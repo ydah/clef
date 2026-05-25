@@ -7,8 +7,13 @@ require "tmpdir"
 
 RSpec::Core::RakeTask.new(:spec)
 
-desc "Run Ruby syntax checks"
+desc "Run Standard Ruby lint"
 task :lint do
+  sh({"RUBOCOP_CACHE_ROOT" => "tmp/rubocop_cache"}, "bundle", "exec", "standardrb")
+end
+
+desc "Run Ruby syntax checks"
+task :syntax do
   files = FileList["lib/**/*.rb", "spec/**/*.rb", "exe/*", "*.gemspec", "Rakefile"]
   files.each { |file| sh RbConfig.ruby, "-c", file }
 end
@@ -29,4 +34,4 @@ rescue LoadError
   end
 end
 
-task default: %i[spec lint build_smoke]
+task default: %i[spec lint syntax build_smoke]

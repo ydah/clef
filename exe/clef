@@ -9,15 +9,12 @@ unless input && output
   exit 64
 end
 
-context = TOPLEVEL_BINDING
-result = eval(File.read(input), context, input)
-score = if result.is_a?(Clef::Core::Score)
-          result
-        elsif context.local_variable_defined?(:score)
-          context.local_variable_get(:score)
-        end
+before = Clef.last_score
+load input, true
+score = Clef.last_score unless Clef.last_score.equal?(before)
+
 unless score.is_a?(Clef::Core::Score)
-  warn "input must evaluate to a Clef::Core::Score"
+  warn "input must build a Clef::Core::Score with Clef.score"
   exit 65
 end
 

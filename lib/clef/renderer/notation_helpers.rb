@@ -94,8 +94,8 @@ module Clef
         return {} unless key_signature
 
         accidentals = key_signature.accidentals
-        order = accidentals[:type] == :sharp ? SHARP_ORDER : FLAT_ORDER
-        alteration = accidentals[:type] == :sharp ? 1 : -1
+        order = (accidentals[:type] == :sharp) ? SHARP_ORDER : FLAT_ORDER
+        alteration = (accidentals[:type] == :sharp) ? 1 : -1
         order.first(accidentals[:count].to_i).to_h { |note_name| [note_name, alteration] }
       end
 

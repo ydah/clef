@@ -4,14 +4,14 @@ module Clef
   module Layout
     class SystemLayout
       System = Struct.new(:page_index, :line_index, :line_top, :start_moment, :end_moment,
-                          :position_offset, :staff_offsets, keyword_init: true) do
+        :position_offset, :staff_offsets, keyword_init: true) do
         def staff_offset(staff_id)
           staff_offsets.fetch(staff_id)
         end
 
         def include_moment?(moment)
           value = moment.is_a?(Clef::Ir::Moment) ? moment.value : Rational(moment)
-          value >= start_moment.value && value <= end_moment.value
+          value.between?(start_moment.value, end_moment.value)
         end
       end
 

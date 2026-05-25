@@ -72,9 +72,9 @@ module Clef
     def build_columns(positions)
       sorted = positions.sort_by { |moment, _x| moment.value }
       sorted.each_cons(2).map do |(moment, x), (_next_moment, next_x)|
-        { moment: moment, x: x, width: [next_x - x, @style.min_note_spacing].max, break_penalty: 0 }
+        {moment: moment, x: x, width: [next_x - x, @style.min_note_spacing].max, break_penalty: 0}
       end + sorted.last(1).map do |moment, x|
-        { moment: moment, x: x, width: @style.min_note_spacing, break_penalty: 0 }
+        {moment: moment, x: x, width: @style.min_note_spacing, break_penalty: 0}
       end
     end
 
@@ -91,7 +91,7 @@ module Clef
           items = metadata_items(staff, measure, current)
           current += measure_length_for(measure)
           items << Clef::Layout::Item.new(type: :barline, moment: current, staff_id: staff.id,
-                                          measure_number: measure.number)
+            measure_number: measure.number)
           items
         end
       end
@@ -100,11 +100,11 @@ module Clef
     def metadata_items(staff, measure, moment)
       [
         Clef::Layout::Item.new(type: :clef, moment: moment, staff_id: staff.id,
-                               measure_number: measure.number, payload: { clef: measure.clef || staff.clef }),
+          measure_number: measure.number, payload: {clef: measure.clef || staff.clef}),
         Clef::Layout::Item.new(type: :key_signature, moment: moment, staff_id: staff.id,
-                               measure_number: measure.number, payload: { key_signature: measure.key_signature || staff.key_signature }),
+          measure_number: measure.number, payload: {key_signature: measure.key_signature || staff.key_signature}),
         Clef::Layout::Item.new(type: :time_signature, moment: moment, staff_id: staff.id,
-                               measure_number: measure.number, payload: { time_signature: measure.time_signature || staff.time_signature })
+          measure_number: measure.number, payload: {time_signature: measure.time_signature || staff.time_signature})
       ].reject { |item| item.payload.values.all?(&:nil?) }
     end
 

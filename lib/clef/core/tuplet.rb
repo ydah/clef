@@ -12,7 +12,7 @@ module Clef
       # @param elements [Array<Note, Rest, Chord, Tuplet>]
       def initialize(actual, normal, elements)
         raise ArgumentError, "tuplet values must be positive" unless actual.is_a?(Integer) && actual.positive? &&
-                                                          normal.is_a?(Integer) && normal.positive?
+          normal.is_a?(Integer) && normal.positive?
 
         @actual = actual
         @normal = normal

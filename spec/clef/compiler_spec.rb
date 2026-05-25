@@ -94,7 +94,7 @@ RSpec.describe Clef::Compiler do
           Clef::Layout::Item.new(
             type: :text,
             moment: Clef::Ir::Moment.new(0),
-            payload: { text: "plugin mark" }
+            payload: {text: "plugin mark"}
           )
         ]
       end

@@ -26,4 +26,15 @@ RSpec.describe Clef::Core::Duration do
     expect(described_class.from_lilypond(128).length).to eq(Rational(1, 128))
     expect(described_class.from_lilypond(256).length).to eq(Rational(1, 256))
   end
+
+  it "roundtrips supported lilypond duration spellings" do
+    described_class::NUMBER_TO_BASE.each_key do |number|
+      (0..3).each do |dots|
+        duration = described_class.from_lilypond(number, dots)
+        dots_text = "." * dots
+
+        expect(duration.to_lilypond).to eq("#{number}#{dots_text}")
+      end
+    end
+  end
 end

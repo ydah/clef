@@ -19,7 +19,7 @@ module Clef
           staff.measures.each do |measure|
             append_measure_metadata(timeline, measure, staff, current)
             append_measure_voices(timeline, measure, staff, current)
-            current = current + measure_length_for(measure)
+            current += measure_length_for(measure)
           end
         end
 
@@ -39,7 +39,7 @@ module Clef
           cursor = Moment.new(start_moment.value)
           voice.elements.each do |element|
             timeline.add(Event.new(moment: cursor, element: element, staff_id: staff_id, voice_id: voice_id))
-            cursor = cursor + element.length
+            cursor += element.length
           end
         end
 

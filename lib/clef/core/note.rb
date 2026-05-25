@@ -60,7 +60,7 @@ module Clef
       def normalize_articulations(values)
         symbols = Array(values).map(&:to_sym)
         invalid = symbols - VALID_ARTICULATIONS
-        raise ArgumentError, "unsupported articulations: #{invalid.join(', ')}" unless invalid.empty?
+        raise ArgumentError, "unsupported articulations: #{invalid.join(", ")}" unless invalid.empty?
 
         symbols
       end

@@ -50,7 +50,8 @@ module Clef
       def append_tempo_track(sequence)
         track = Track.new(sequence)
         sequence.tracks << track
-        write_tempo_events(track)
+        last_tick = write_tempo_events(track)
+        append_track_end(track, score_length, last_tick)
       end
 
       def append_staff_tracks(sequence)
@@ -65,7 +66,8 @@ module Clef
 
       def append_staff(track, staff, channel)
         note_events = collect_staff_note_events(staff, channel)
-        write_delta_events(track, note_events)
+        last_tick = write_delta_events(track, note_events)
+        append_track_end(track, staff_length(staff), last_tick)
       end
 
       def collect_staff_note_events(staff, channel)
@@ -80,7 +82,7 @@ module Clef
       end
 
       def collect_voice_events(voice, start_time, channel)
-        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, { velocity: DEFAULT_VELOCITY })
+        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, {velocity: DEFAULT_VELOCITY})
         events
       end
 
@@ -99,7 +101,7 @@ module Clef
             cursor += element.length * ratio
           when Clef::Core::Tuplet
             nested_events, = collect_elements(element.elements, cursor, channel, ratio * element.ratio,
-                                             pending_ties, playback_state)
+              pending_ties, playback_state)
             events.concat(nested_events)
             cursor += element.length * ratio
           when Clef::Notation::Dynamic
@@ -138,8 +140,8 @@ module Clef
       def schedule_chord(chord, start_time, channel, ratio, playback_state)
         duration = chord.length * ratio
         chord.pitches.map do |pitch|
-          { start_time: start_time, duration: duration, pitch: pitch.to_midi,
-            velocity: playback_state[:velocity], channel: channel }
+          {start_time: start_time, duration: duration, pitch: pitch.to_midi,
+           velocity: playback_state[:velocity], channel: channel}
         end
       end
 
@@ -175,6 +177,7 @@ module Clef
           track.events << event
           previous_tick = tick
         end
+        previous_tick
       end
 
       def effective_note_length(note, duration)
@@ -208,8 +211,8 @@ module Clef
 
       def write_tempo_events(track)
         events = ([[Rational(0, 1), quarter_note_bpm]] + collect_score_tempo_events)
-                 .uniq { |time, _bpm| time }
-                 .sort_by(&:first)
+          .uniq { |time, _bpm| time }
+          .sort_by(&:first)
         previous_tick = 0
         events.each do |time, bpm|
           tick = ticks_for(time)
@@ -218,6 +221,12 @@ module Clef
           track.events << event
           previous_tick = tick
         end
+        previous_tick
+      end
+
+      def append_track_end(track, length, previous_tick)
+        tick = ticks_for(length)
+        track.events << MetaEvent.new(META_TRACK_END, nil, tick - previous_tick)
       end
 
       def collect_score_tempo_events
@@ -258,6 +267,14 @@ module Clef
         return measure.time_signature.measure_length if measure.time_signature
 
         measure.voices.values.map(&:total_length).max || Rational(0, 1)
+      end
+
+      def staff_length(staff)
+        staff.measures.sum { |measure| measure_length_for(measure) }
+      end
+
+      def score_length
+        score.staves.map { |staff| staff_length(staff) }.max || Rational(0, 1)
       end
 
       def quarter_note_bpm

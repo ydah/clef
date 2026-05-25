@@ -38,7 +38,7 @@ module Clef
       private
 
       def build_positions(moments)
-        positions = { moments.first => 0.0 }
+        positions = {moments.first => 0.0}
         total = 0.0
         moments.each_cons(2) do |left, right|
           total += interval_width(right.value - left.value)

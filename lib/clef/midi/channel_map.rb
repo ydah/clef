@@ -10,7 +10,7 @@ module Clef
         return 9 if percussion
 
         base = staff_index % 15
-        base >= 9 ? base + 1 : base
+        (base >= 9) ? base + 1 : base
       end
     end
   end
