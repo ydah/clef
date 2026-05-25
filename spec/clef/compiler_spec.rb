@@ -42,4 +42,31 @@ RSpec.describe Clef::Compiler do
     expect(layout[:pages]).not_to be_empty
     expect(layout[:beams].dig(:melody, 1, :default).first.length).to eq(4)
   end
+
+  it "runs register_glyphs and after-render plugin hooks" do
+    plugin = Class.new(Clef::Plugins::Base) do
+      attr_reader :rendered_path
+
+      def register_glyphs(glyph_table)
+        glyph_table.register(:custom_plugin_glyph, "x")
+      end
+
+      def on_before_render(renderer)
+        renderer.glyph_table.fetch(:custom_plugin_glyph)
+      end
+
+      def on_after_render(path)
+        @rendered_path = path
+      end
+    end
+    registry = Clef::Plugins::Registry.new
+    instance = registry.register(plugin)
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "score.svg")
+      described_class.new(simple_score, plugins: registry).compile_to_svg(path)
+
+      expect(instance.rendered_path).to eq(path)
+    end
+  end
 end

@@ -19,6 +19,15 @@ module Clef
       # @param _renderer [Object]
       def on_before_render(_renderer); end
 
+      # @param _path [String, #write]
+      def on_after_render(_path); end
+
+      # @param _score [Clef::Core::Score]
+      def on_after_parse(_score); end
+
+      # @param _exporter [Clef::Midi::Exporter]
+      def on_before_midi(_exporter); end
+
       # @param _glyph_table [Clef::Engraving::GlyphTable]
       def register_glyphs(_glyph_table); end
     end

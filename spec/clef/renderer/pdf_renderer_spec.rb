@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tmpdir"
+require "stringio"
 
 RSpec.describe Clef::Renderer::PdfRenderer do
   it "renders a PDF file" do
@@ -11,6 +12,17 @@ RSpec.describe Clef::Renderer::PdfRenderer do
       expect(File.exist?(path)).to be(true)
       expect(File.size(path)).to be > 0
     end
+  end
+
+  it "writes PDF to IO objects and validates missing directories" do
+    io = StringIO.new
+
+    described_class.new.render(simple_score, io)
+
+    expect(io.string.bytesize).to be > 0
+    expect do
+      described_class.new.render(simple_score, "/missing-clef-dir/score.pdf")
+    end.to raise_error(ArgumentError, /output directory/)
   end
 
   it "draws five staff lines" do

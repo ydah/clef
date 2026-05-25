@@ -16,6 +16,7 @@ module Clef
     def compile_to_pdf(path)
       layout = build_layout
       renderer = Clef::Renderer::PdfRenderer.new(style: @style)
+      @plugins.run_hook(:register_glyphs, renderer.glyph_table)
       @plugins.run_hook(:on_before_render, renderer)
       renderer.render(@score, path, positions: layout[:positions], layout: layout)
       @plugins.run_hook(:on_after_render, path)
@@ -27,6 +28,7 @@ module Clef
     def compile_to_svg(path)
       layout = build_layout
       renderer = Clef::Renderer::SvgRenderer.new(style: @style)
+      @plugins.run_hook(:register_glyphs, renderer.glyph_table)
       @plugins.run_hook(:on_before_render, renderer)
       renderer.render(@score, path, positions: layout[:positions], layout: layout)
       @plugins.run_hook(:on_after_render, path)

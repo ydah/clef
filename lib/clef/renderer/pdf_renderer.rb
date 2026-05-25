@@ -16,6 +16,9 @@ module Clef
       # @param positions [Hash]
       # @param layout [Hash, nil]
       def render(score, path, positions: nil, layout: nil, **_options)
+        return render_to_io(score, path, positions: positions, layout: layout) if path.respond_to?(:write)
+
+        ensure_parent_directory!(path)
         Prawn::Document.generate(path, page_size: style.page_size, margin: style.margin) do |pdf|
           prepare_canvas(pdf)
           draw_score(pdf, score, positions, layout: layout)
@@ -579,6 +582,20 @@ module Clef
 
       def tempo_text(tempo)
         "#{tempo.beat_unit.to_lilypond} = #{tempo.bpm}"
+      end
+
+      def render_to_io(score, io, positions:, layout:)
+        pdf = Prawn::Document.new(page_size: style.page_size, margin: style.margin)
+        prepare_canvas(pdf)
+        draw_score(pdf, score, positions, layout: layout)
+        io.write(pdf.render)
+      end
+
+      def ensure_parent_directory!(path)
+        parent = File.dirname(path.to_s)
+        return if parent.nil? || parent == "." || Dir.exist?(parent)
+
+        raise ArgumentError, "output directory does not exist: #{parent}"
       end
     end
   end

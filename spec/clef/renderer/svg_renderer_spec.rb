@@ -2,6 +2,7 @@
 
 require "tmpdir"
 require "nokogiri"
+require "stringio"
 
 RSpec.describe Clef::Renderer::SvgRenderer do
   it "renders an SVG file" do
@@ -12,6 +13,17 @@ RSpec.describe Clef::Renderer::SvgRenderer do
       expect(File.exist?(path)).to be(true)
       expect(File.read(path)).to include("<svg")
     end
+  end
+
+  it "writes SVG to IO objects and validates missing directories" do
+    io = StringIO.new
+
+    described_class.new.render(simple_score, io)
+
+    expect(io.string).to include("<svg")
+    expect do
+      described_class.new.render(simple_score, "/missing-clef-dir/score.svg")
+    end.to raise_error(ArgumentError, /output directory/)
   end
 
   it "draws stems for quarter notes" do

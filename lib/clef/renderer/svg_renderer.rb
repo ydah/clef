@@ -27,7 +27,7 @@ module Clef
             draw_score(xml, score, positions: positions, layout: layout)
           end
         end
-        File.write(path, document.to_xml)
+        write_output(path, document.to_xml)
       end
 
       # @param xml [Nokogiri::XML::Builder]
@@ -462,6 +462,20 @@ module Clef
 
       def svg_height(score)
         [STAFF_TOP + (score.staves.length * style.staff_gap) + style.staff_gap, 180].max
+      end
+
+      def write_output(target, content)
+        return target.write(content) if target.respond_to?(:write)
+
+        ensure_parent_directory!(target)
+        File.write(target, content)
+      end
+
+      def ensure_parent_directory!(path)
+        parent = File.dirname(path.to_s)
+        return if parent.nil? || parent == "." || Dir.exist?(parent)
+
+        raise ArgumentError, "output directory does not exist: #{parent}"
       end
     end
   end
