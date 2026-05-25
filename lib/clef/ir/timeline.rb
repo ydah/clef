@@ -17,6 +17,11 @@ module Clef
         raise ArgumentError, "event must be a Clef::Ir::Event" unless event.is_a?(Event)
 
         events << event
+        self
+      end
+
+      # @return [Timeline]
+      def sort!
         events.sort_by! { |item| item.moment.value }
         self
       end
@@ -25,7 +30,7 @@ module Clef
       # @return [Array<Event>]
       def events_at(moment)
         target = moment_value(moment)
-        events.select { |event| event.moment.value == target }
+        sorted_events.select { |event| event.moment.value == target }
       end
 
       # @param from [Moment, Rational, Integer]
@@ -34,7 +39,16 @@ module Clef
       def events_between(from, to)
         lower = moment_value(from)
         upper = moment_value(to)
-        events.select { |event| (lower..upper).cover?(event.moment.value) }
+        sorted_events.select { |event| (lower..upper).cover?(event.moment.value) }
+      end
+
+      # @param from [Moment, Rational, Integer]
+      # @param to [Moment, Rational, Integer]
+      # @return [Array<Event>]
+      def events_in_range(from, to)
+        lower = moment_value(from)
+        upper = moment_value(to)
+        sorted_events.select { |event| event.moment.value >= lower && event.moment.value < upper }
       end
 
       # @yield [Moment]
@@ -46,7 +60,7 @@ module Clef
       end
 
       def each(&block)
-        events.each(&block)
+        sorted_events.each(&block)
       end
 
       # @return [Rational]
@@ -58,7 +72,11 @@ module Clef
       private
 
       def unique_moments
-        events.map(&:moment).uniq.sort
+        sorted_events.map(&:moment).uniq
+      end
+
+      def sorted_events
+        events.sort_by { |item| item.moment.value }
       end
 
       def moment_value(value)

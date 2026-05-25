@@ -8,15 +8,23 @@ module Clef
       include NotationHelpers
 
       WIDTH = 1024
-      HEIGHT = 512
+      LEFT_PADDING = 60
+      RIGHT_PADDING = 60
+      STAFF_START_X = 140
+      STAFF_TOP = 90
 
       # @param score [Clef::Core::Score]
       # @param path [String]
-      # @param _positions [Hash]
-      def render(score, path, _positions: nil, **_options)
+      # @param positions [Hash]
+      # @param _layout [Hash, nil]
+      def render(score, path, positions: nil, layout: nil, **_options)
+        height = svg_height(score)
         document = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
-          xml.svg(xmlns: "http://www.w3.org/2000/svg", width: WIDTH, height: HEIGHT) do
-            draw_score(xml, score)
+          xml.svg(xmlns: "http://www.w3.org/2000/svg",
+                  width: WIDTH,
+                  height: height,
+                  viewBox: "0 0 #{WIDTH} #{height}") do
+            draw_score(xml, score, positions: positions, layout: layout)
           end
         end
         File.write(path, document.to_xml)
@@ -24,11 +32,19 @@ module Clef
 
       # @param xml [Nokogiri::XML::Builder]
       # @param score [Clef::Core::Score]
-      def draw_score(xml, score)
-        score.staves.each_with_index do |staff, index|
-          baseline = 80 + (index * style.staff_space * 9)
-          draw_staff_lines(xml, baseline)
-          draw_notes(xml, staff, baseline)
+      # @param positions [Hash, nil]
+      # @param layout [Hash, nil]
+      def draw_score(xml, score, positions: nil, layout: nil)
+        draw_header(xml, score)
+        staff_index = 0
+        score.staff_groups.each do |group|
+          group_start = STAFF_TOP + (staff_index * style.staff_gap)
+          group.staves.each do |staff|
+            baseline = STAFF_TOP + (staff_index * style.staff_gap)
+            draw_staff(xml, staff, baseline, positions: positions, layout: layout)
+            staff_index += 1
+          end
+          draw_staff_group(xml, group, group_start, staff_index - 1) if group.staves.length > 1
         end
       end
 
@@ -37,24 +53,8 @@ module Clef
       def draw_staff_lines(xml, baseline)
         5.times do |line|
           y = baseline + (line * style.staff_space)
-          xml.line(x1: 60, y1: y, x2: WIDTH - 60, y2: y, stroke: "black", "stroke-width": 1)
-        end
-      end
-
-      # @param xml [Nokogiri::XML::Builder]
-      # @param staff [Clef::Core::Staff]
-      # @param baseline [Float]
-      def draw_notes(xml, staff, baseline)
-        x = 140
-        staff.measures.each do |measure|
-          voice = measure.voices.values.first
-          next unless voice
-
-          voice.elements.each do |element|
-            draw_element(xml, element, x, baseline, staff.clef)
-            x += duration_spacing(element)
-          end
-          x += 16
+          xml.line(x1: LEFT_PADDING, y1: y, x2: WIDTH - RIGHT_PADDING, y2: y,
+                   stroke: "black", "stroke-width": 1, class: "staff-line")
         end
       end
 
@@ -65,88 +65,171 @@ module Clef
       # @param clef [Clef::Core::Clef]
       def draw_element(xml, element, x, baseline, clef)
         case element
-        when Clef::Core::Note then draw_note(xml, element, x, baseline, clef)
+        when Clef::Core::Note then draw_note(xml, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
         when Clef::Core::Rest then draw_rest(xml, element, x, baseline)
-        when Clef::Core::Chord then draw_chord(xml, element, x, baseline, clef)
+        when Clef::Core::Chord then draw_chord(xml, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
+        when Clef::Core::Tuplet then draw_tuplet(xml, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
         end
       end
 
       private
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param note [Clef::Core::Note]
-      # @param x [Float]
-      # @param baseline [Float]
-      # @param clef [Clef::Core::Clef]
-      def draw_note(xml, note, x, baseline, clef)
+      def draw_header(xml, score)
+        draw_text(xml, score.title, x: LEFT_PADDING, y: 30, class: "title", "font-size": 18, fill: "black") if score.title
+        if score.composer
+          draw_text(xml, score.composer, x: WIDTH - RIGHT_PADDING, y: 30, class: "composer",
+                    "font-size": 12, fill: "black", "text-anchor": "end")
+        end
+        return unless score.tempo
+
+        draw_text(xml, tempo_text(score.tempo), x: LEFT_PADDING, y: 52, class: "tempo", "font-size": 11, fill: "black")
+      end
+
+      def draw_staff(xml, staff, baseline, positions:, layout:)
+        draw_staff_lines(xml, baseline)
+        cursor = draw_clef(xml, staff.clef, LEFT_PADDING + 8, baseline)
+        cursor = draw_key_signature(xml, staff.key_signature, cursor + style.staff_space, baseline)
+        cursor = draw_time_signature(xml, staff.time_signature, cursor + style.staff_space, baseline)
+        note_points = draw_measures(xml, staff, [cursor + style.measure_padding, STAFF_START_X].max, baseline, positions, layout)
+        draw_lyrics(xml, staff, note_points, baseline)
+      end
+
+      def draw_staff_group(xml, group, first_baseline, last_staff_index)
+        last_baseline = STAFF_TOP + (last_staff_index * style.staff_gap)
+        x = LEFT_PADDING - 24
+        case group.bracket_type
+        when :brace
+          draw_text(xml, "{", x: x, y: first_baseline + style.staff_space * 3.5,
+                    class: "staff-group brace", "font-size": (last_baseline - first_baseline + 50), fill: "black")
+        when :bracket
+          xml.path(d: "M #{x + 8} #{first_baseline} L #{x} #{first_baseline} L #{x} #{last_baseline + (style.staff_space * 4)} L #{x + 8} #{last_baseline + (style.staff_space * 4)}",
+                   fill: "none", stroke: "black", "stroke-width": 2, class: "staff-group bracket")
+        end
+      end
+
+      def draw_measures(xml, staff, start_x, baseline, positions, layout)
+        note_points = {}
+        measure_start = Clef::Ir::Moment.new(0)
+        staff.measures.each do |measure|
+          measure_points = draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout)
+          note_points.merge!(measure_points)
+          bar_x = x_for_moment(positions, measure_start + measure_length_for(measure), start_x)
+          draw_barline(xml, bar_x, baseline)
+          measure_start += measure_length_for(measure)
+        end
+        note_points
+      end
+
+      def draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout)
+        note_points = {}
+        accidental_state = {}
+        measure.voices.each_with_index do |(voice_id, voice), index|
+          voice_offset = voice_vertical_offset(index)
+          cursor = Clef::Ir::Moment.new(measure_start.value)
+          voice.elements.each do |element|
+            x = x_for_moment(positions, cursor, start_x)
+            draw_element_with_context(xml, element, x, baseline + voice_offset, staff, measure, accidental_state, note_points)
+            cursor += element.length
+          end
+          draw_beams(xml, layout, staff, measure, voice_id, note_points)
+          draw_note_connections(xml, voice.elements, note_points)
+        end
+        note_points
+      end
+
+      def draw_element_with_context(xml, element, x, baseline, staff, measure, accidental_state, note_points)
+        case element
+        when Clef::Core::Note
+          draw_note(xml, element, x, baseline, staff.clef,
+                    accidental_state: accidental_state,
+                    key_signature: measure.key_signature || staff.key_signature)
+          note_points[element.object_id] = [x, pitch_y(element.pitch, baseline, staff.clef)]
+        when Clef::Core::Rest
+          draw_rest(xml, element, x, baseline)
+        when Clef::Core::Chord
+          draw_chord(xml, element, x, baseline, staff.clef,
+                     accidental_state: accidental_state,
+                     key_signature: measure.key_signature || staff.key_signature)
+        when Clef::Core::Tuplet
+          draw_tuplet(xml, element, x, baseline, staff.clef,
+                      accidental_state: accidental_state,
+                      key_signature: measure.key_signature || staff.key_signature,
+                      note_points: note_points)
+        end
+      end
+
+      def draw_note(xml, note, x, baseline, clef, accidental_state:, key_signature:)
         y = pitch_y(note.pitch, baseline, clef)
+        draw_ledger_lines(xml, x, y, baseline)
         draw_notehead(xml, x, y, duration: note.duration)
-        draw_accidental(xml, note.pitch, x, y)
+        draw_accidental(xml, note.pitch, x, y, key_signature, accidental_state)
         draw_stem(xml, note, x, y, clef) if stem_required?(note.duration)
+        draw_flag(xml, note, x, y, clef) if flag_required?(note.duration)
         draw_dot(xml, note.duration, x, y)
         draw_articulations(xml, note.articulations, x, y)
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param rest [Clef::Core::Rest]
-      # @param x [Float]
-      # @param baseline [Float]
       def draw_rest(xml, rest, x, baseline)
+        return if rest.kind == :invisible || rest.kind == :spacer
+
+        y = rest_y(rest, baseline)
         if rest.duration.base == :whole
-          xml.rect(x: x - 4, y: baseline + (style.staff_space * 2.8), width: 8, height: 3, fill: "black")
+          xml.rect(x: x - 4, y: y, width: 8, height: 3, fill: "black", class: "rest rest-whole")
+        elsif rest.duration.base == :half
+          xml.rect(x: x - 4, y: y - style.staff_space, width: 8, height: 3, fill: "black", class: "rest rest-half")
         else
-          draw_text(xml, "r", x: x - 4, y: baseline + (style.staff_space * 2.1), fill: "black", "font-size": 14)
+          draw_text(xml, rest_label(rest.duration), x: x - 4, y: y, fill: "black", "font-size": 14,
+                    class: "rest rest-#{rest.duration.base}")
         end
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param chord [Clef::Core::Chord]
-      # @param x [Float]
-      # @param baseline [Float]
-      # @param clef [Clef::Core::Clef]
-      def draw_chord(xml, chord, x, baseline, clef)
+      def draw_chord(xml, chord, x, baseline, clef, accidental_state:, key_signature:)
         notes = chord_notes(chord)
+        offsets = chord_note_offsets(notes)
         ys = []
-        notes.each do |note|
+        notes.each_with_index do |note, index|
           y = pitch_y(note.pitch, baseline, clef)
           ys << y
-          draw_notehead(xml, x, y, duration: chord.duration)
-          draw_accidental(xml, note.pitch, x, y)
+          note_x = x + offsets[index]
+          draw_ledger_lines(xml, note_x, y, baseline)
+          draw_notehead(xml, note_x, y, duration: chord.duration)
+          draw_accidental(xml, note.pitch, note_x - accidental_offset(index), y, key_signature, accidental_state)
         end
         draw_chord_stem(xml, notes, x, ys, clef) if stem_required?(chord.duration)
-        draw_dot(xml, chord.duration, x, ys.sum / ys.length.to_f)
+        ys.each { |y| draw_dot(xml, chord.duration, x, y) }
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param x [Float]
-      # @param y [Float]
-      # @param duration [Clef::Core::Duration]
+      def draw_tuplet(xml, tuplet, x, baseline, clef, accidental_state:, key_signature:, note_points: {})
+        cursor = x
+        tuplet.elements.each do |element|
+          draw_element_with_context(xml, element, cursor, baseline,
+                                    Struct.new(:clef, :key_signature).new(clef, key_signature),
+                                    Struct.new(:key_signature).new(key_signature),
+                                    accidental_state,
+                                    note_points)
+          cursor += duration_spacing(element) * tuplet.ratio
+        end
+        draw_text(xml, tuplet.actual.to_s, x: x + ((cursor - x) / 2.0), y: baseline - style.staff_space,
+                  class: "tuplet", "font-size": 10, fill: "black", "text-anchor": "middle")
+      end
+
       def draw_notehead(xml, x, y, duration:)
         if filled_notehead?(duration)
-          xml.circle(cx: x, cy: y, r: 3, fill: "black")
+          xml.circle(cx: x, cy: y, r: style.notehead_width / 2.0, fill: "black", class: "notehead filled")
         else
-          xml.ellipse(cx: x, cy: y, rx: 3.5, ry: 2.5, fill: "white", stroke: "black", "stroke-width": 1)
+          xml.ellipse(cx: x, cy: y, rx: style.notehead_width / 2.0, ry: 2.5,
+                      fill: "white", stroke: "black", "stroke-width": 1, class: "notehead hollow")
         end
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param note [Clef::Core::Note]
-      # @param x [Float]
-      # @param y [Float]
-      # @param clef [Clef::Core::Clef]
       def draw_stem(xml, note, x, y, clef)
         direction = Clef::Layout::Stem.direction(note, clef)
         stem_len = style.staff_space * Clef::Layout::Stem.length(note, clef, direction)
         y2 = direction == :up ? y - stem_len : y + stem_len
         stem_x = direction == :up ? x + 3 : x - 3
-        xml.line(x1: stem_x, y1: y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1)
+        xml.line(x1: stem_x, y1: y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1, class: "stem")
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param notes [Array<Clef::Core::Note>]
-      # @param x [Float]
-      # @param ys [Array<Float>]
-      # @param clef [Clef::Core::Clef]
       def draw_chord_stem(xml, notes, x, ys, clef)
         direction = Clef::Layout::Stem.direction(notes, clef)
         anchor_note = chord_stem_anchor_note(notes, direction)
@@ -155,40 +238,144 @@ module Clef
         stem_len = style.staff_space * chord_stem_length(notes, clef, direction)
         y2 = direction == :up ? anchor_y - stem_len : anchor_y + stem_len
         stem_x = direction == :up ? x + 3 : x - 3
-        xml.line(x1: stem_x, y1: anchor_y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1)
+        xml.line(x1: stem_x, y1: anchor_y, x2: stem_x, y2: y2, stroke: "black", "stroke-width": 1, class: "stem")
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param pitch [Clef::Core::Pitch]
-      # @param x [Float]
-      # @param y [Float]
-      def draw_accidental(xml, pitch, x, y)
-        key = accidental_glyph_key(pitch.alteration)
-        return unless key
-
-        draw_text(xml, accidental_text(pitch.alteration), x: x - 12, y: y + 3, fill: "black", "font-size": 9)
+      def draw_flag(xml, note, x, y, clef)
+        direction = Clef::Layout::Stem.direction(note, clef)
+        stem_len = style.staff_space * Clef::Layout::Stem.length(note, clef, direction)
+        stem_x = direction == :up ? x + 3 : x - 3
+        stem_y = direction == :up ? y - stem_len : y + stem_len
+        sweep = direction == :up ? 10 : -10
+        xml.path(d: "M #{stem_x} #{stem_y} q 12 #{sweep} 4 #{sweep * 2}",
+                 fill: "none", stroke: "black", "stroke-width": 1, class: "flag")
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param duration [Clef::Core::Duration]
-      # @param x [Float]
-      # @param y [Float]
+      def draw_accidental(xml, pitch, x, y, key_signature, state)
+        alteration = accidental_for_pitch(pitch, key_signature, state)
+        return if alteration.nil?
+
+        draw_text(xml, accidental_text(alteration), x: x - 12, y: y + 3, fill: "black", "font-size": 9, class: "accidental")
+      end
+
       def draw_dot(xml, duration, x, y)
         return if duration.dots.zero?
 
         duration.dots.times do |index|
-          xml.circle(cx: x + 8 + (index * 3), cy: y, r: 1, fill: "black")
+          xml.circle(cx: x + 8 + (index * 3), cy: y, r: 1, fill: "black", class: "dot")
         end
       end
 
-      # @param xml [Nokogiri::XML::Builder]
-      # @param articulations [Array<Symbol>]
-      # @param x [Float]
-      # @param y [Float]
       def draw_articulations(xml, articulations, x, y)
-        return if articulations.empty?
+        articulations.each do |articulation|
+          case articulation
+          when :staccato
+            xml.circle(cx: x, cy: y - 12, r: 1.5, fill: "black", class: "articulation staccato")
+          when :tenuto
+            xml.line(x1: x - 4, y1: y - 12, x2: x + 4, y2: y - 12, stroke: "black",
+                     "stroke-width": 1, class: "articulation tenuto")
+          when :accent
+            draw_text(xml, ">", x: x - 4, y: y - 10, fill: "black", "font-size": 9, class: "articulation accent")
+          else
+            draw_text(xml, articulation.to_s, x: x - 4, y: y - 12, fill: "black", "font-size": 6, class: "articulation")
+          end
+        end
+      end
 
-        draw_text(xml, articulations.join(","), x: x - 4, y: y - 12, fill: "black", "font-size": 6)
+      def draw_beams(xml, layout, staff, measure, voice_id, note_points)
+        Array(layout&.dig(:beams, staff.id, measure.number, voice_id)).each do |group|
+          points = group.filter_map { |note| note_points[note.object_id] }
+          next if points.length < 2
+
+          y = points.map(&:last).min - (style.staff_space * 3.5)
+          xml.line(x1: points.first.first + 3, y1: y, x2: points.last.first + 3, y2: y,
+                   stroke: "black", "stroke-width": style.beam_thickness, class: "beam")
+        end
+      end
+
+      def draw_note_connections(xml, elements, note_points)
+        notes = flatten_elements(elements).select { |element| element.is_a?(Clef::Core::Note) }
+        notes.each_with_index do |note, index|
+          draw_connection_to_next(xml, note, notes[(index + 1)..], note_points, "tie") if note.tie_state == :start
+          draw_connection_to_next(xml, note, notes[(index + 1)..], note_points, "slur") if note.slur_start
+        end
+      end
+
+      def draw_connection_to_next(xml, note, candidates, note_points, class_name)
+        target = class_name == "tie" ? candidates&.find { |candidate| candidate.pitch.enharmonic?(note.pitch) } : candidates&.find(&:slur_end)
+        return unless target
+
+        start_point = note_points[note.object_id]
+        end_point = note_points[target.object_id]
+        return unless start_point && end_point
+
+        lift = class_name == "tie" ? 8 : 14
+        path = "M #{start_point[0] + 5} #{start_point[1] - 5} C #{start_point[0] + 18} #{start_point[1] - lift}, " \
+               "#{end_point[0] - 18} #{end_point[1] - lift}, #{end_point[0] - 5} #{end_point[1] - 5}"
+        xml.path(d: path, fill: "none", stroke: "black", "stroke-width": 1, class: class_name)
+      end
+
+      def draw_lyrics(xml, staff, note_points, baseline)
+        Array(staff.metadata[:lyrics]).each do |lyric|
+          notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
+                      .select { |element| element.is_a?(Clef::Core::Note) }
+          lyric.syllables.zip(notes).each do |syllable, note|
+            point = note_points[note.object_id]
+            next unless syllable && point
+
+            draw_text(xml, syllable, x: point.first, y: baseline + (style.staff_space * 6.5),
+                      fill: "black", "font-size": 10, "text-anchor": "middle", class: "lyric")
+          end
+        end
+      end
+
+      def draw_ledger_lines(xml, x, y, baseline)
+        top = baseline
+        bottom = baseline + (style.staff_space * 4)
+        return if y >= top && y <= bottom
+
+        start_line = y < top ? y : bottom + style.staff_space
+        end_line = y < top ? top - style.staff_space : y
+        current = nearest_staff_line(start_line)
+        while current <= end_line
+          xml.line(x1: x - 6, y1: current, x2: x + 6, y2: current,
+                   stroke: "black", "stroke-width": 1, class: "ledger-line")
+          current += style.staff_space
+        end
+      end
+
+      def draw_clef(xml, clef, x, baseline)
+        draw_text(xml, fallback_clef_text(clef), x: x, y: baseline + (style.staff_space * 3.2),
+                  class: "clef", "font-size": 22, fill: "black")
+        x + 24
+      end
+
+      def draw_key_signature(xml, key_signature, x, baseline)
+        return x unless key_signature
+
+        accidentals = key_signature.accidentals
+        order = accidentals[:type] == :sharp ? NotationHelpers::SHARP_ORDER : NotationHelpers::FLAT_ORDER
+        text = accidentals[:type] == :sharp ? "#" : "b"
+        order.first(accidentals[:count].to_i).each_with_index do |note_name, index|
+          draw_text(xml, text, x: x + (index * 8), y: baseline + key_signature_y(note_name),
+                    class: "key-signature", "font-size": 12, fill: "black")
+        end
+        x + (accidentals[:count].to_i * 8)
+      end
+
+      def draw_time_signature(xml, time_signature, x, baseline)
+        return x unless time_signature
+
+        draw_text(xml, time_signature.numerator.to_s, x: x, y: baseline + (style.staff_space * 1.6),
+                  class: "time-signature numerator", "font-size": 11, fill: "black", "text-anchor": "middle")
+        draw_text(xml, time_signature.denominator.to_s, x: x, y: baseline + (style.staff_space * 3.3),
+                  class: "time-signature denominator", "font-size": 11, fill: "black", "text-anchor": "middle")
+        x + 14
+      end
+
+      def draw_barline(xml, x, baseline)
+        xml.line(x1: x, y1: baseline, x2: x, y2: baseline + (style.staff_space * 4),
+                 stroke: "black", "stroke-width": 1, class: "barline")
       end
 
       def pitch_y(pitch, baseline, clef)
@@ -200,6 +387,81 @@ module Clef
         attributes.each { |key, value| node[key.to_s] = value.to_s }
         node.content = content.to_s
         xml.parent << node
+      end
+
+      def x_for_moment(positions, moment, start_x)
+        return start_x unless positions
+
+        start_x + positions.fetch(moment, 0.0)
+      end
+
+      def measure_length_for(measure)
+        return measure.time_signature.measure_length if measure.time_signature
+
+        measure.voices.values.map(&:total_length).max || Rational(0, 1)
+      end
+
+      def voice_vertical_offset(index)
+        return 0 if index.zero?
+
+        index.odd? ? style.staff_space * 0.8 : -style.staff_space * 0.8
+      end
+
+      def rest_y(rest, baseline)
+        offset = {
+          whole: 2.8,
+          half: 2.8,
+          quarter: 2.3,
+          eighth: 2.0,
+          sixteenth: 2.0
+        }.fetch(rest.duration.base, 2.0)
+        baseline + (style.staff_space * offset)
+      end
+
+      def fallback_clef_text(clef)
+        {
+          treble: "G",
+          bass: "F",
+          alto: "C",
+          tenor: "C",
+          percussion: "||",
+          tab: "TAB"
+        }.fetch(clef.type, clef.type.to_s[0].upcase)
+      end
+
+      def key_signature_y(note_name)
+        {
+          f: style.staff_space * 0.9,
+          c: style.staff_space * 2.4,
+          g: style.staff_space * 0.5,
+          d: style.staff_space * 2.0,
+          a: style.staff_space * 3.4,
+          e: style.staff_space * 1.5,
+          b: style.staff_space * 3.0
+        }.fetch(note_name)
+      end
+
+      def chord_note_offsets(notes)
+        notes.each_with_index.map do |note, index|
+          previous = notes[index - 1]
+          previous && (diatonic_step(note.pitch) - diatonic_step(previous.pitch)).abs == 1 ? 6 : 0
+        end
+      end
+
+      def accidental_offset(index)
+        index * 4
+      end
+
+      def nearest_staff_line(value)
+        (value / style.staff_space).floor * style.staff_space
+      end
+
+      def tempo_text(tempo)
+        "#{tempo.beat_unit.to_lilypond} = #{tempo.bpm}"
+      end
+
+      def svg_height(score)
+        [STAFF_TOP + (score.staves.length * style.staff_gap) + style.staff_gap, 180].max
       end
     end
   end

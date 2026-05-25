@@ -82,7 +82,7 @@ RSpec.describe Clef::Renderer::SvgRenderer do
 
     expect(vertical_lines(document)).not_to be_empty
     expect(texts).to include("#")
-    expect(circles.length).to eq(4)
+    expect(circles.length).to eq(6)
   end
 
   it "draws whole rests differently from non-whole rests" do
@@ -110,6 +110,64 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(quarter_doc.xpath("//xmlns:text").map(&:text)).to include("r")
   end
 
+  it "renders clef, key signature, time signature, and barlines structurally" do
+    score = Clef.score do
+      staff :melody, clef: :bass do
+        key :bes, :major
+        time 3, 4
+        play "c'2."
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='clef']").map(&:text)).to include("F")
+    expect(document.xpath("//*[contains(@class, 'key-signature')]").length).to eq(2)
+    expect(document.xpath("//*[contains(@class, 'time-signature')]").map(&:text)).to include("3", "4")
+    expect(document.xpath("//*[@class='barline']").length).to eq(1)
+  end
+
+  it "renders multiple voices and lyrics" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice :upper do
+          notes "c'4 d'4 e'4 f'4"
+        end
+        voice :lower do
+          notes "g4 a4 b4 c'4"
+        end
+        lyrics :upper, "la la la la"
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[contains(@class, 'notehead')]").length).to eq(8)
+    expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(%w[la la la la])
+  end
+
+  it "renders beams, flags, ties, and slurs" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        play "( c'8~ c'8 ) d'8 e'8 r4 c'16"
+      end
+    end
+
+    document = nil
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "score.svg")
+      Clef::Compiler.new(score).compile_to_svg(path)
+      document = Nokogiri::XML(File.read(path))
+    end
+
+    expect(document.xpath("//*[@class='beam']").length).to be > 0
+    expect(document.xpath("//*[@class='flag']").length).to be > 0
+    expect(document.xpath("//*[@class='tie']").length).to eq(1)
+    expect(document.xpath("//*[@class='slur']").length).to eq(1)
+  end
+
   def render_svg_document(score)
     xml = nil
     Dir.mktmpdir do |dir|
@@ -122,7 +180,7 @@ RSpec.describe Clef::Renderer::SvgRenderer do
 
   def vertical_lines(document)
     document.xpath("//xmlns:line").select do |line|
-      line["x1"] == line["x2"] && line["y1"] != line["y2"]
+      line["class"] == "stem" && line["x1"] == line["x2"] && line["y1"] != line["y2"]
     end
   end
 end
