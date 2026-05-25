@@ -8,9 +8,9 @@ RSpec.describe "notation classes" do
   end
 
   it "parses lyric syllables" do
-    lyric = Clef::Notation::Lyric.new(:voice1, "la-la _ lu")
+    lyric = Clef::Notation::Lyric.new(:voice1, "la-la _ -- lu")
 
-    expect(lyric.syllables).to eq(%w[la la _ lu])
+    expect(lyric.syllables).to eq(%w[la la _ -- lu])
   end
 
   it "validates ties with same pitch" do

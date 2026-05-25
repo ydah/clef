@@ -40,7 +40,7 @@ module Clef
 
       attr_reader :tonic, :mode
 
-      # @param tonic [Pitch, Symbol]
+      # @param tonic [Pitch, Symbol, String]
       # @param mode [Symbol]
       def initialize(tonic, mode = :major)
         @tonic = normalize_tonic(tonic)
@@ -51,16 +51,18 @@ module Clef
       # @return [Hash]
       def accidentals
         table = mode == :major ? MAJOR_ACCIDENTALS : MINOR_ACCIDENTALS
-        table.fetch(tonic_key) { { count: 0, type: :natural } }
+        table.fetch(tonic_key)
+      rescue KeyError
+        raise ArgumentError, "unsupported #{mode} key tonic: #{tonic.to_lilypond}"
       end
 
       private
 
       def normalize_tonic(tonic)
         return tonic if tonic.is_a?(Pitch)
-        return Pitch.new(tonic, 4) if tonic.is_a?(Symbol)
+        return Pitch.parse_any(tonic) if tonic.is_a?(Symbol) || tonic.is_a?(String)
 
-        raise ArgumentError, "tonic must be a Pitch or Symbol"
+        raise ArgumentError, "tonic must be a Pitch, Symbol, or String"
       end
 
       def tonic_key

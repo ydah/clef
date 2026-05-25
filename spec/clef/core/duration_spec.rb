@@ -21,4 +21,9 @@ RSpec.describe Clef::Core::Duration do
     expect { described_class.new(:invalid) }.to raise_error(ArgumentError)
     expect { described_class.new(:quarter, dots: -1) }.to raise_error(ArgumentError)
   end
+
+  it "supports 128th and 256th durations" do
+    expect(described_class.from_lilypond(128).length).to eq(Rational(1, 128))
+    expect(described_class.from_lilypond(256).length).to eq(Rational(1, 256))
+  end
 end

@@ -5,11 +5,33 @@ module Clef
     module DSL
       class Error < StandardError; end
 
+      module BlockEvaluation
+        private
+
+        def evaluate_block(target, &block)
+          return unless block
+          return block.call(target) if block.arity == 1
+
+          target.instance_eval(&block)
+        end
+
+        def method_missing(name, *_args, &_block)
+          raise Error, "invalid DSL method: #{name}"
+        end
+
+        def respond_to_missing?(_name, _include_private = false)
+          false
+        end
+      end
+
       class ScoreBuilder
+        include BlockEvaluation
+
         attr_reader :score
 
-        def initialize
+        def initialize(plugins: Clef.plugins)
           @score = Clef::Core::Score.new
+          @score.plugins = plugins
           @default_group = Clef::Core::StaffGroup.new([], bracket_type: :none)
           score.add_staff_group(@default_group)
         end
@@ -36,38 +58,28 @@ module Clef
         # @param clef [Symbol]
         def staff(id, name: nil, clef: :treble, &block)
           staff = Clef::Core::Staff.new(id, name: name, clef: Clef::Core::Clef.new(clef))
-          build_staff(staff, &block)
+          evaluate_block(StaffBuilder.new(staff), &block)
           @default_group.add_staff(staff)
           staff
-        rescue NoMethodError => e
-          raise Error, "invalid DSL method in staff block: #{e.name}"
         end
 
         # @param bracket_type [Symbol]
         def staff_group(bracket_type, &block)
           group = Clef::Core::StaffGroup.new([], bracket_type: bracket_type)
-          GroupBuilder.new(group).instance_eval(&block)
+          evaluate_block(GroupBuilder.new(group), &block)
           score.add_staff_group(group)
           group
-        rescue NoMethodError => e
-          raise Error, "invalid DSL method in staff_group block: #{e.name}"
         end
 
         # @return [Clef::Core::Score]
         def build
           score
         end
-
-        private
-
-        def build_staff(staff, &block)
-          return unless block
-
-          StaffBuilder.new(staff).instance_eval(&block)
-        end
       end
 
       class GroupBuilder
+        include BlockEvaluation
+
         def initialize(group)
           @group = group
         end
@@ -77,13 +89,15 @@ module Clef
         # @param clef [Symbol]
         def staff(id, name: nil, clef: :treble, &block)
           staff = Clef::Core::Staff.new(id, name: name, clef: Clef::Core::Clef.new(clef))
-          StaffBuilder.new(staff).instance_eval(&block) if block
+          evaluate_block(StaffBuilder.new(staff), &block)
           @group.add_staff(staff)
           staff
         end
       end
 
       class StaffBuilder
+        include BlockEvaluation
+
         def initialize(staff)
           @staff = staff
           @current_measure = nil
@@ -91,7 +105,7 @@ module Clef
           @lyrics = []
         end
 
-        # @param tonic [Symbol, Clef::Core::Pitch]
+        # @param tonic [Symbol, String, Clef::Core::Pitch]
         # @param mode [Symbol]
         def key(tonic, mode = :major)
           @staff.key_signature = Clef::Core::KeySignature.new(tonic, mode)
@@ -109,10 +123,9 @@ module Clef
           voice = measure.voice(id)
           return voice unless block
 
-          VoiceBuilder.new(voice).instance_eval(&block)
+          evaluate_block(VoiceBuilder.new(voice), &block)
+          validate_measure_overflow!(measure)
           voice
-        rescue NoMethodError => e
-          raise Error, "invalid DSL method in voice block: #{e.name}"
         end
 
         # @param lilypond_string [String]
@@ -121,8 +134,22 @@ module Clef
           segments.each_with_index do |segment, idx|
             measure = ensure_measure
             VoiceBuilder.new(measure.voice(:default)).notes(segment)
+            validate_measure_overflow!(measure)
             advance_measure if idx < segments.length - 1
           end
+        end
+
+        def bar
+          advance_measure
+        end
+
+        # @param number [Integer, nil]
+        def measure(number = nil, &block)
+          @current_measure = new_measure(number || @next_measure_number)
+          evaluate_block(self, &block)
+          @current_measure
+        ensure
+          advance_measure
         end
 
         # @param voice_id [Symbol]
@@ -138,12 +165,16 @@ module Clef
         def ensure_measure
           return @current_measure if @current_measure
 
-          @current_measure = Clef::Core::Measure.new(@next_measure_number, time_signature: @staff.time_signature)
-          @current_measure.key_signature = @staff.key_signature
-          @current_measure.clef = @staff.clef
-          @staff.add_measure(@current_measure)
-          @next_measure_number += 1
-          @current_measure
+          @current_measure = new_measure(@next_measure_number)
+        end
+
+        def new_measure(number)
+          measure = Clef::Core::Measure.new(number, time_signature: @staff.time_signature)
+          measure.key_signature = @staff.key_signature
+          measure.clef = @staff.clef
+          @staff.add_measure(measure)
+          @next_measure_number = measure.number + 1
+          measure
         end
 
         def advance_measure
@@ -153,11 +184,26 @@ module Clef
         def split_measures(input)
           input.to_s.split("|").map(&:strip).reject(&:empty?)
         end
+
+        def validate_measure_overflow!(measure)
+          ids = measure.overflowing_voice_ids
+          return if ids.empty?
+
+          raise Error, "measure #{measure.number} voice #{ids.join(', ')} exceeds time signature length"
+        end
       end
 
       class VoiceBuilder
+        include BlockEvaluation
+
         def initialize(voice)
           @voice = voice
+          @last_duration = Clef::Core::Duration.quarter
+          @pending_tie = false
+          @pending_articulations = []
+          @open_slur = false
+          @open_beam = false
+          @last_note = nil
         end
 
         # @param pitch_str [String]
@@ -174,7 +220,7 @@ module Clef
         # @param opts [Hash]
         def rest(duration_sym, **opts)
           duration = Clef::Core::Duration.new(duration_sym, dots: opts.fetch(:dots, 0))
-          @voice.add(Clef::Core::Rest.new(duration))
+          @voice.add(Clef::Core::Rest.new(duration, kind: opts.fetch(:kind, :visible), measures: opts.fetch(:measures, 1)))
         end
 
         # @param pitch_strs [Array<String>]
@@ -193,22 +239,30 @@ module Clef
 
         # @param actual [Integer]
         # @param normal [Integer]
-        def tuplet(actual, normal)
+        def tuplet(actual, normal, &block)
           raise ArgumentError, "tuplet values must be positive" unless actual.positive? && normal.positive?
-
           return unless block_given?
 
-          yield
+          voice = Clef::Core::Voice.new(id: @voice.id)
+          evaluate_block(self.class.new(voice), &block)
+          @voice.add(Clef::Core::Tuplet.new(actual, normal, voice.elements))
         end
 
         private
 
         def parse_tokens(input)
-          input.to_s.split(/\s+/).reject(&:empty?)
+          Clef::Parser::LilypondLexer.new.tokenize(input)
         end
 
         def add_token(token)
+          token = token.to_s
           return if token == "|"
+          return start_slur if token == "("
+          return end_slur if token == ")"
+          return start_beam if token == "["
+          return end_beam if token == "]"
+          return tie_next if token == "~"
+          return add_pending_articulation(token) if articulation_token?(token)
 
           if token.start_with?("r")
             add_rest_token(token)
@@ -222,42 +276,133 @@ module Clef
         end
 
         def add_rest_token(token)
-          match = /\Ar(\d+)(\.*)\z/.match(token)
+          match = /\Ar(\d*)(\.*)\z/.match(token)
           raise ArgumentError, "invalid rest token" unless match
 
-          duration = Clef::Core::Duration.from_lilypond(match[1].to_i, match[2].length)
+          duration = duration_from_match(match[1], match[2])
           @voice.add(Clef::Core::Rest.new(duration))
         end
 
         def add_chord_token(token)
-          match = /\A<([^>]+)>(\d+)(\.*)\z/.match(token)
+          token, tied = split_tie_suffix(token)
+          match = /\A<([^>]+)>(\d*)(\.*)\z/.match(token)
           raise ArgumentError, "invalid chord token" unless match
 
           pitches = match[1].split(/\s+/).map { |value| parse_pitch(value) }
-          duration = Clef::Core::Duration.from_lilypond(match[2].to_i, match[3].length)
+          duration = duration_from_match(match[2], match[3])
           @voice.add(Clef::Core::Chord.new(pitches, duration))
+          tie_next if tied
         end
 
         def add_note_token(token)
-          match = /\A([a-g](?:isis|eses|is|es)?[',]*)(\d+)(\.*)\z/.match(token)
+          token, tied = split_tie_suffix(token)
+          token, articulations = split_articulation_suffixes(token)
+          @pending_articulations.concat(articulations)
+          match = /\A([a-g](?:isis|eses|is|es)?[',]*)(\d*)(\.*)\z/.match(token)
           raise ArgumentError, "invalid note token" unless match
 
           pitch = parse_pitch(match[1])
-          duration = Clef::Core::Duration.from_lilypond(match[2].to_i, match[3].length)
-          @voice.add(Clef::Core::Note.new(pitch, duration))
+          duration = duration_from_match(match[2], match[3])
+          note = Clef::Core::Note.new(pitch, duration,
+                                      articulations: consume_articulations,
+                                      tied: consume_tie_state)
+          note.slur_start = consume_slur_start
+          note.beam_start = consume_beam_start
+          @voice.add(note)
+          @last_note = note
+          tie_next if tied
         end
 
         def parse_pitch(value)
-          parse_scientific_pitch(value) || Clef::Core::Pitch.parse(value.downcase)
+          Clef::Core::Pitch.parse_any(value)
         end
 
-        def parse_scientific_pitch(value)
-          match = /\A([A-Ga-g])([#b]{0,2})(-?\d+)\z/.match(value)
-          return nil unless match
+        def duration_from_match(number, dots)
+          duration = if number.empty?
+                       @last_duration
+                     else
+                       Clef::Core::Duration.from_lilypond(number.to_i, dots.length)
+                     end
+          @last_duration = duration
+          duration
+        end
 
-          note_name = match[1].downcase.to_sym
-          alteration = { "" => 0, "#" => 1, "##" => 2, "b" => -1, "bb" => -2 }.fetch(match[2])
-          Clef::Core::Pitch.new(note_name, match[3].to_i, alteration: alteration)
+        def split_tie_suffix(token)
+          return [token.delete_suffix("~"), true] if token.end_with?("~")
+
+          [token, false]
+        end
+
+        def split_articulation_suffixes(token)
+          articulations = []
+          loop do
+            suffix = { "-." => :staccato, "->" => :accent, "--" => :tenuto }.find { |marker, _| token.end_with?(marker) }
+            break unless suffix
+
+            marker, articulation = suffix
+            token = token.delete_suffix(marker)
+            articulations << articulation
+          end
+          [token, articulations.reverse]
+        end
+
+        def articulation_token?(token)
+          %w[-. -> --].include?(token)
+        end
+
+        def add_pending_articulation(token)
+          articulation = { "-." => :staccato, "->" => :accent, "--" => :tenuto }.fetch(token)
+          if @last_note
+            @last_note.articulations << articulation
+          else
+            @pending_articulations << articulation
+          end
+        end
+
+        def consume_articulations
+          @pending_articulations.tap { @pending_articulations = [] }
+        end
+
+        def tie_next
+          @last_note.tied = :start if @last_note
+          @pending_tie = true
+        end
+
+        def consume_tie_state
+          return false unless @pending_tie
+
+          @pending_tie = false
+          :stop
+        end
+
+        def start_slur
+          @open_slur = true
+        end
+
+        def end_slur
+          @last_note.slur_end = true if @last_note
+        end
+
+        def start_beam
+          @open_beam = true
+        end
+
+        def end_beam
+          @last_note.beam_end = true if @last_note
+        end
+
+        def consume_slur_start
+          return false unless @open_slur
+
+          @open_slur = false
+          true
+        end
+
+        def consume_beam_start
+          return false unless @open_beam
+
+          @open_beam = false
+          true
         end
       end
     end

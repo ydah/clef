@@ -11,7 +11,7 @@ module Clef
         validate_pitches!(pitches)
         raise ArgumentError, "duration must be a Clef::Core::Duration" unless duration.is_a?(Duration)
 
-        @pitches = pitches.sort
+        @pitches = Array(pitches)
         @duration = duration
       end
 
@@ -20,14 +20,20 @@ module Clef
         duration.length
       end
 
+      # @return [Array<Pitch>]
+      def sorted_pitches
+        pitches.sort
+      end
+
       private
 
       def validate_pitches!(pitches)
         list = Array(pitches)
         raise ArgumentError, "pitches must not be empty" if list.empty?
-        return if list.all? { |pitch| pitch.is_a?(Pitch) }
+        raise ArgumentError, "all chord pitches must be Clef::Core::Pitch" unless list.all? { |pitch| pitch.is_a?(Pitch) }
+        return if list.uniq.length == list.length
 
-        raise ArgumentError, "all chord pitches must be Clef::Core::Pitch"
+        raise ArgumentError, "chord pitches must not contain duplicates"
       end
     end
   end

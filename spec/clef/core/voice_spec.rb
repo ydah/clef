@@ -8,4 +8,10 @@ RSpec.describe Clef::Core::Voice do
 
     expect(voice.total_length).to eq(Rational(1, 2))
   end
+
+  it "rejects non-musical elements" do
+    voice = described_class.new
+
+    expect { voice.add("quarter") }.to raise_error(ArgumentError, /musical element/)
+  end
 end

@@ -27,6 +27,10 @@ RSpec.describe Clef::Core::Pitch do
       expect(described_class.new(:b, 3, alteration: -1).to_midi).to eq(58)
     end
 
+    it "raises when midi number is outside the valid range" do
+      expect { described_class.new(:c, 10).to_midi }.to raise_error(RangeError)
+    end
+
     it "converts to frequency" do
       expect(described_class.new(:a, 4).to_frequency).to be_within(0.0001).of(440.0)
     end
@@ -36,6 +40,7 @@ RSpec.describe Clef::Core::Pitch do
     it "transposes by semitones" do
       transposed = described_class.new(:c, 4).transpose(7)
       expect(transposed).to eq(described_class.new(:g, 4))
+      expect(described_class.new(:c, 4).transpose(1, prefer: :flat).to_lilypond).to eq("des'")
     end
 
     it "checks enharmonic equivalence" do
@@ -71,6 +76,10 @@ RSpec.describe Clef::Core::Pitch do
 
     it "rejects invalid lilypond string" do
       expect { described_class.parse("z#4") }.to raise_error(ArgumentError)
+    end
+
+    it "parses scientific pitch strings through the shared parser" do
+      expect(described_class.parse_any("Bb5").to_lilypond).to eq("bes''")
     end
   end
 end

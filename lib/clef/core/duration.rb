@@ -12,7 +12,9 @@ module Clef
         eighth: Rational(1, 8),
         sixteenth: Rational(1, 16),
         thirty_second: Rational(1, 32),
-        sixty_fourth: Rational(1, 64)
+        sixty_fourth: Rational(1, 64),
+        one_twenty_eighth: Rational(1, 128),
+        two_fifty_sixth: Rational(1, 256)
       }.freeze
       NUMBER_TO_BASE = {
         1 => :whole,
@@ -21,7 +23,9 @@ module Clef
         8 => :eighth,
         16 => :sixteenth,
         32 => :thirty_second,
-        64 => :sixty_fourth
+        64 => :sixty_fourth,
+        128 => :one_twenty_eighth,
+        256 => :two_fifty_sixth
       }.freeze
       BASE_TO_NUMBER = NUMBER_TO_BASE.invert.freeze
 

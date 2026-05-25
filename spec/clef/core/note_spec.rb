@@ -19,5 +19,19 @@ RSpec.describe Clef::Core::Note do
 
     expect(note.articulations).to include(:staccato, :accent)
     expect(note.tied).to be(true)
+    expect(note.tie_state).to eq(:start)
+  end
+
+  it "supports explicit tie states" do
+    note = described_class.new(pitch, duration, tied: :stop)
+
+    expect(note.tied).to be(true)
+    expect(note.tie_state).to eq(:stop)
+  end
+
+  it "rejects unknown articulations" do
+    expect do
+      described_class.new(pitch, duration, articulations: [:unknown])
+    end.to raise_error(ArgumentError, /unsupported articulations/)
   end
 end

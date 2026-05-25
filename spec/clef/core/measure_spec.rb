@@ -11,4 +11,11 @@ RSpec.describe Clef::Core::Measure do
 
     expect(measure.overflowing_voice_ids).to contain_exactly(:default)
   end
+
+  it "detects underfull voices by time signature" do
+    measure = described_class.new(1, time_signature: Clef::Core::TimeSignature.new(4, 4))
+    measure.voice(:default).add(Clef::Core::Rest.new(Clef::Core::Duration.quarter))
+
+    expect(measure.underfull_voice_ids).to eq([:default])
+  end
 end

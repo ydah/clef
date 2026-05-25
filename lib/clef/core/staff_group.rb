@@ -21,6 +21,7 @@ module Clef
       # @return [StaffGroup]
       def add_staff(staff)
         raise ArgumentError, "staff must be a Clef::Core::Staff" unless staff.is_a?(Staff)
+        raise ArgumentError, "duplicate staff id: #{staff.id}" if staves.any? { |item| item.id == staff.id }
 
         staves << staff
         self

@@ -20,8 +20,14 @@ module Clef
       def parse_syllables(input)
         input
           .split(/\s+/)
-          .flat_map { |token| token.split("-") }
+          .flat_map { |token| lyric_token_parts(token) }
           .reject(&:empty?)
+      end
+
+      def lyric_token_parts(token)
+        return [token] if %w[_ --].include?(token)
+
+        token.split("-")
       end
     end
   end

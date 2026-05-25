@@ -22,7 +22,6 @@ module Clef
       def voice(id = :default)
         current = voices[id] ||= Voice.new(id: id)
         yield(current) if block_given?
-        warn_overflow_if_needed(id, current)
         current
       end
 
@@ -33,13 +32,13 @@ module Clef
         voices.filter_map { |id, voice| id if voice.total_length > time_signature.measure_length }
       end
 
-      private
+      # @return [Array<Symbol>]
+      def underfull_voice_ids
+        return [] unless time_signature
 
-      def warn_overflow_if_needed(id, voice)
-        return unless time_signature
-        return unless voice.total_length > time_signature.measure_length
-
-        warn("Measure #{number} voice #{id} exceeds time signature length")
+        voices.filter_map do |id, voice|
+          id if voice.total_length.positive? && voice.total_length < time_signature.measure_length
+        end
       end
     end
   end

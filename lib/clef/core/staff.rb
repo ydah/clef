@@ -25,6 +25,10 @@ module Clef
       # @return [Staff]
       def add_measure(measure)
         raise ArgumentError, "measure must be a Clef::Core::Measure" unless measure.is_a?(Measure)
+        raise ArgumentError, "duplicate measure number: #{measure.number}" if measures.any? { |item| item.number == measure.number }
+        if measures.any? && measure.number < measures.last.number
+          raise ArgumentError, "measure numbers must be added in ascending order"
+        end
 
         measures << measure
         self

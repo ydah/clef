@@ -37,6 +37,23 @@ module Clef
         10 => [:a, 1],
         11 => [:b, 0]
       }.freeze
+      MIDI_CLASS_TO_FLAT_PITCH = {
+        0 => [:c, 0],
+        1 => [:d, -1],
+        2 => [:d, 0],
+        3 => [:e, -1],
+        4 => [:e, 0],
+        5 => [:f, 0],
+        6 => [:g, -1],
+        7 => [:g, 0],
+        8 => [:a, -1],
+        9 => [:a, 0],
+        10 => [:b, -1],
+        11 => [:b, 0]
+      }.freeze
+      SCIENTIFIC_PITCH_REGEX = /\A([A-Ga-g])([#b]{0,2})(-?\d+)\z/.freeze
+      LILYPOND_PITCH_REGEX = /\A([a-g])(eses|isis|es|is)?([',]*)\z/.freeze
+      MIDI_RANGE = (0..127).freeze
 
       attr_reader :note_name, :octave, :alteration
 
@@ -56,7 +73,10 @@ module Clef
 
       # @return [Integer]
       def to_midi
-        semitones + 12
+        midi = semitones + 12
+        raise RangeError, "MIDI pitch out of range: #{midi}" unless MIDI_RANGE.cover?(midi)
+
+        midi
       end
 
       # @return [Integer]
@@ -71,11 +91,15 @@ module Clef
       end
 
       # @param semitones_or_interval [Integer, #semitones]
+      # @param prefer [Symbol]
       # @return [Pitch]
-      def transpose(semitones_or_interval)
+      def transpose(semitones_or_interval, prefer: :sharp)
         target_midi = to_midi + normalize_semitones(semitones_or_interval)
+        raise RangeError, "MIDI pitch out of range: #{target_midi}" unless MIDI_RANGE.cover?(target_midi)
+
         octave = (target_midi / 12) - 1
-        note_name, alteration = MIDI_CLASS_TO_PITCH.fetch(target_midi % 12)
+        pitch_map = prefer == :flat ? MIDI_CLASS_TO_FLAT_PITCH : MIDI_CLASS_TO_PITCH
+        note_name, alteration = pitch_map.fetch(target_midi % 12)
         self.class.new(note_name, octave, alteration: alteration)
       end
 
@@ -103,13 +127,37 @@ module Clef
       def self.parse(str)
         raise ArgumentError, "pitch string must be a String" unless str.is_a?(String)
 
-        match = /\A([a-g])(eses|isis|es|is)?([',]*)\z/.match(str)
+        match = LILYPOND_PITCH_REGEX.match(str)
         raise ArgumentError, "invalid lilypond pitch: #{str}" unless match
 
         note_name = match[1].to_sym
         suffix = match[2] || ""
         octave = 3 + match[3].count("'") - match[3].count(",")
         new(note_name, octave, alteration: SUFFIX_ALTERATION.fetch(suffix))
+      end
+
+      # @param str [String]
+      # @return [Pitch]
+      def self.parse_scientific(str)
+        raise ArgumentError, "pitch string must be a String" unless str.is_a?(String)
+
+        match = SCIENTIFIC_PITCH_REGEX.match(str)
+        raise ArgumentError, "invalid scientific pitch: #{str}" unless match
+
+        note_name = match[1].downcase.to_sym
+        alteration = { "" => 0, "#" => 1, "##" => 2, "b" => -1, "bb" => -2 }.fetch(match[2])
+        new(note_name, match[3].to_i, alteration: alteration)
+      end
+
+      # @param value [String, Symbol, Pitch]
+      # @return [Pitch]
+      def self.parse_any(value)
+        return value if value.is_a?(self)
+        return parse(value.to_s.downcase) if value.is_a?(Symbol)
+
+        parse_scientific(value)
+      rescue ArgumentError
+        parse(value.to_s.downcase)
       end
 
       private
