@@ -352,11 +352,18 @@ module Clef
         pdf.stroke_line [x, top], [x, bottom]
       end
 
-      # Compatibility extension points; concrete drawing now happens during measure rendering.
-      def draw_slurs(_pdf, _slurs = [])
+      # @param pdf [Prawn::Document]
+      # @param slurs [Array<Clef::Notation::Slur>]
+      # @param note_points [Hash]
+      def draw_slurs(pdf, slurs = [], note_points: {})
+        slurs.each { |slur| draw_notation_connection(pdf, slur, note_points, lift: 14) }
       end
 
-      def draw_ties(_pdf, _ties = [])
+      # @param pdf [Prawn::Document]
+      # @param ties [Array<Clef::Notation::Tie>]
+      # @param note_points [Hash]
+      def draw_ties(pdf, ties = [], note_points: {})
+        ties.each { |tie| draw_notation_connection(pdf, tie, note_points, lift: 8) }
       end
 
       private
@@ -490,11 +497,17 @@ module Clef
         target = (kind == :tie) ? candidates&.find { |candidate| candidate.pitch.enharmonic?(note.pitch) } : candidates&.find(&:slur_end)
         return unless target
 
-        start_point = note_points[note.object_id]
-        end_point = note_points[target.object_id]
+        connection = (kind == :tie) ? Clef::Notation::Tie.new(note, target) : Clef::Notation::Slur.new(note, target)
+        return draw_ties(pdf, [connection], note_points: note_points) if kind == :tie
+
+        draw_slurs(pdf, [connection], note_points: note_points)
+      end
+
+      def draw_notation_connection(pdf, connection, note_points, lift:)
+        start_point = note_points[connection.start_note.object_id]
+        end_point = note_points[connection.end_note.object_id]
         return unless start_point && end_point
 
-        lift = (kind == :tie) ? 8 : 14
         if pdf.respond_to?(:stroke_curve)
           pdf.stroke_curve [start_point[0] + 5, start_point[1] + 5],
             [end_point[0] - 5, end_point[1] + 5],

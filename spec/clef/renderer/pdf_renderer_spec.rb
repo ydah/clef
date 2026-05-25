@@ -204,6 +204,27 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     expect(pdf).to have_received(:stroke_line)
   end
 
+  it "draws tie and slur notation objects" do
+    c4 = Clef::Core::Pitch.new(:c, 4)
+    d4 = Clef::Core::Pitch.new(:d, 4)
+    first = Clef::Core::Note.new(c4, Clef::Core::Duration.quarter)
+    tied = Clef::Core::Note.new(c4, Clef::Core::Duration.quarter)
+    slurred = Clef::Core::Note.new(d4, Clef::Core::Duration.quarter)
+    note_points = {
+      first.object_id => [100, 80],
+      tied.object_id => [130, 80],
+      slurred.object_id => [160, 76]
+    }
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:stroke_curve)
+
+    renderer.draw_ties(pdf, [Clef::Notation::Tie.new(first, tied)], note_points: note_points)
+    renderer.draw_slurs(pdf, [Clef::Notation::Slur.new(first, slurred)], note_points: note_points)
+
+    expect(pdf).to have_received(:stroke_curve).twice
+  end
+
   it "uses duration-specific SMuFL rest glyphs" do
     glyph_table = Clef::Engraving::GlyphTable.new(glyphs: {
       rest_quarter: "quarter",
