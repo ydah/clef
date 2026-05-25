@@ -6,7 +6,7 @@ class RegistrySpecDummyPlugin < Clef::Plugins::Base
   end
 
   def on_before_layout(score)
-    score.metadata[:hooked] = true
+    score.set_metadata(:hooked, true)
   end
 end
 

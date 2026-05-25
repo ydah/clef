@@ -136,7 +136,7 @@ Clef exposes plugin hooks through `Clef.plugins`.
 ```ruby
 class MarkerPlugin < Clef::Plugins::Base
   def on_before_layout(score)
-    score.metadata[:prepared] = true
+    score.set_metadata(:prepared, true)
   end
 end
 

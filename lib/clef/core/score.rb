@@ -3,20 +3,14 @@
 module Clef
   module Core
     class Score
-      attr_reader :metadata
+      include Metadata
+
       attr_accessor :title, :composer, :tempo, :plugins
 
       # @param metadata [Hash]
       def initialize(metadata: {})
         @staff_groups = []
-        @metadata = metadata.dup
-      end
-
-      # @param value [Hash]
-      def metadata=(value)
-        raise ArgumentError, "metadata must be a Hash" unless value.is_a?(Hash)
-
-        @metadata = value.dup
+        self.metadata = metadata
       end
 
       # @param staff_group [StaffGroup]

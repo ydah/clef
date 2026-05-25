@@ -132,6 +132,8 @@ module Clef
 
       def initialize: (?metadata: Hash[untyped, untyped]) -> void
       def metadata=: (Hash[untyped, untyped] value) -> Hash[untyped, untyped]
+      def set_metadata: (untyped key, untyped value) -> Score
+      def update_metadata: (?Hash[untyped, untyped] value, **untyped kwargs) -> Score
       def add_staff_group: (StaffGroup staff_group) -> Score
       def add_staff: (Staff staff) -> Score
       def staves: () -> Array[Staff]
@@ -154,6 +156,8 @@ module Clef
 
       def initialize: (Symbol id, ?name: String?, ?clef: Clef) -> void
       def metadata=: (Hash[untyped, untyped] value) -> Hash[untyped, untyped]
+      def set_metadata: (untyped key, untyped value) -> Staff
+      def update_metadata: (?Hash[untyped, untyped] value, **untyped kwargs) -> Staff
       def add_measure: (Measure measure) -> Staff
     end
 

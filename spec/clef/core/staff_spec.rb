@@ -18,6 +18,20 @@ RSpec.describe Clef::Core::Staff do
     expect(staff.metadata[:instrument]).to eq("Piano")
   end
 
+  it "exposes metadata as an immutable snapshot with explicit update methods" do
+    staff = described_class.new(:piano)
+    staff.set_metadata(:lyrics, ["la"])
+
+    expect(staff.metadata).to be_frozen
+    expect(staff.metadata[:lyrics]).to be_frozen
+    expect { staff.metadata[:instrument] = "Piano" }.to raise_error(FrozenError)
+    expect { staff.metadata[:lyrics] << "la" }.to raise_error(FrozenError)
+
+    staff.update_metadata(instrument: "Piano")
+
+    expect(staff.metadata[:instrument]).to eq("Piano")
+  end
+
   it "does not expose the mutable measure store" do
     staff = described_class.new(:piano)
     staff.add_measure(Clef::Core::Measure.new(1))

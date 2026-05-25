@@ -101,6 +101,20 @@ RSpec.describe Clef::Core::Score do
     expect(score.metadata[:title]).to eq("Sketch")
   end
 
+  it "exposes metadata as an immutable snapshot with explicit update methods" do
+    score = described_class.new(metadata: {tags: [:draft]})
+
+    expect(score.metadata).to be_frozen
+    expect(score.metadata[:tags]).to be_frozen
+    expect { score.metadata[:prepared] = true }.to raise_error(FrozenError)
+    expect { score.metadata[:tags] << :reviewed }.to raise_error(FrozenError)
+
+    score.set_metadata(:prepared, true)
+    score.update_metadata(title: "Sketch")
+
+    expect(score.metadata).to include(prepared: true, title: "Sketch")
+  end
+
   it "does not expose mutable staff group collections" do
     score = described_class.new
     score.add_staff(Clef::Core::Staff.new(:melody))

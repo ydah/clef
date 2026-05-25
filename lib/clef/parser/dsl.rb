@@ -121,7 +121,7 @@ module Clef
 
         # @param program [Integer]
         def instrument(program)
-          @staff.metadata[:midi_program] = program
+          @staff.set_metadata(:midi_program, program)
         end
 
         # @param id [Symbol]
@@ -166,8 +166,7 @@ module Clef
         # @param text [String]
         def lyrics(voice_id, text)
           @lyrics << Clef::Notation::Lyric.new(voice_id, text)
-          @staff.metadata ||= {}
-          @staff.metadata[:lyrics] = @lyrics
+          @staff.set_metadata(:lyrics, @lyrics)
         end
 
         private
