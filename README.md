@@ -1,5 +1,10 @@
 # Clef
 
+[![Ruby](https://github.com/ydah/clef/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ydah/clef/actions/workflows/main.yml)
+[![Gem Version](https://img.shields.io/gem/v/clef.svg)](https://rubygems.org/gems/clef)
+[![Ruby Version](https://img.shields.io/badge/ruby-%3E%3D%203.1-red.svg)](https://www.ruby-lang.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
+
 Clef is a lightweight Ruby toolkit for building small music scores, parsing a practical LilyPond-style syntax subset, and exporting PDF, SVG, or MIDI.
 
 It is intended for concise notation workflows, examples, and application embedding. It is not a full replacement for LilyPond, MusicXML, or a publishing-grade engraving engine.
