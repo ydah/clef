@@ -31,7 +31,7 @@ module Clef
         list = Array(pitches)
         raise ArgumentError, "pitches must not be empty" if list.empty?
         raise ArgumentError, "all chord pitches must be Clef::Core::Pitch" unless list.all? { |pitch| pitch.is_a?(Pitch) }
-        return if list.uniq.length == list.length
+        return if list.map(&:semitones).uniq.length == list.length
 
         raise ArgumentError, "chord pitches must not contain duplicates"
       end

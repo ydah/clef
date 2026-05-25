@@ -135,7 +135,7 @@ module Clef
         staves.flat_map do |staff|
           Array(staff.metadata[:lyrics]).flat_map do |lyric|
             note_count = staff.measures.sum do |measure|
-              Array(measure.voices[lyric.voice_id]&.elements).count { |element| element.is_a?(Note) }
+              lyric_notes(Array(measure.voices[lyric.voice_id]&.elements)).length
             end
             next [] if lyric.syllables.length == note_count
 
@@ -146,6 +146,16 @@ module Clef
                 path: [:staff, staff.id, :lyrics, lyric.voice_id]
               )
             ]
+          end
+        end
+      end
+
+      def lyric_notes(elements)
+        elements.flat_map do |element|
+          case element
+          when Note then [element]
+          when Tuplet then lyric_notes(element.elements)
+          else []
           end
         end
       end

@@ -485,6 +485,7 @@ module Clef
       def draw_lyrics(pdf, staff, note_points, baseline)
         Array(staff.metadata[:lyrics]).each do |lyric|
           notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
+            .then { |elements| flatten_elements(elements) }
             .select { |element| element.is_a?(Clef::Core::Note) }
           lyric.syllables.zip(notes).each do |syllable, note|
             point = note_points[note.object_id]

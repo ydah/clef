@@ -37,6 +37,22 @@ RSpec.describe Clef::Core::Score do
     expect(result.warnings.map(&:message)).to include(/shorter than time signature length/)
   end
 
+  it "validates lyrics against notes inside tuplets" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 4
+        voice :lead do
+          tuplet 3, 2 do
+            notes "c'8 d'8 e'8"
+          end
+        end
+        lyrics :lead, "la la la"
+      end
+    end
+
+    expect(score.validate.warnings.map(&:message)).not_to include(/lyrics/)
+  end
+
   it "routes to exporters by file extension" do
     score = described_class.new
 

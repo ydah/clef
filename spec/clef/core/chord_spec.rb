@@ -19,4 +19,13 @@ RSpec.describe Clef::Core::Chord do
       described_class.new([c4, c4], Clef::Core::Duration.quarter)
     end.to raise_error(ArgumentError, /duplicates/)
   end
+
+  it "rejects duplicate sounding pitches from separate objects" do
+    c_sharp = Clef::Core::Pitch.new(:c, 4, alteration: 1)
+    d_flat = Clef::Core::Pitch.new(:d, 4, alteration: -1)
+
+    expect do
+      described_class.new([c_sharp, d_flat], Clef::Core::Duration.quarter)
+    end.to raise_error(ArgumentError, /duplicates/)
+  end
 end

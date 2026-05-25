@@ -102,6 +102,45 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     expect(pdf).not_to have_received(:ellipse)
   end
 
+  it "draws one PDF dot per duration dot" do
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:circle)
+    allow(pdf).to receive(:fill)
+
+    renderer.send(:draw_dot, pdf, Clef::Core::Duration.new(:quarter, dots: 2), 100, 100)
+
+    expect(pdf).to have_received(:circle).with([108, 100], 1)
+    expect(pdf).to have_received(:circle).with([111, 100], 1)
+    expect(pdf).to have_received(:fill).twice
+  end
+
+  it "draws lyrics for notes inside tuplets" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 4
+        voice :lead do
+          tuplet 3, 2 do
+            notes "c'8 d'8 e'8"
+          end
+        end
+        lyrics :lead, "tri o let"
+      end
+    end
+    staff = score.staves.first
+    notes = staff.measures.first.voices[:lead].elements.first.elements
+    note_points = notes.each_with_index.to_h { |note, index| [note.object_id, [100 + (index * 20), 80]] }
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:text_box)
+
+    renderer.send(:draw_lyrics, pdf, staff, note_points, 100)
+
+    expect(pdf).to have_received(:text_box).with("tri", hash_including(size: 8, align: :center))
+    expect(pdf).to have_received(:text_box).with("o", hash_including(size: 8, align: :center))
+    expect(pdf).to have_received(:text_box).with("let", hash_including(size: 8, align: :center))
+  end
+
   it "uses duration-specific SMuFL rest glyphs" do
     glyph_table = Clef::Engraving::GlyphTable.new(glyphs: {
       rest_quarter: "quarter",

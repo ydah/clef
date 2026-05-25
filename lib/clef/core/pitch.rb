@@ -53,6 +53,7 @@ module Clef
       }.freeze
       SCIENTIFIC_PITCH_REGEX = /\A([A-Ga-g])([#b]{0,2})(-?\d+)\z/
       LILYPOND_PITCH_REGEX = /\A([a-g])(eses|isis|es|is)?([',]*)\z/
+      TRANSPOSE_PREFERENCES = %i[sharp flat].freeze
       MIDI_RANGE = (0..127)
 
       attr_reader :note_name, :octave, :alteration
@@ -94,6 +95,8 @@ module Clef
       # @param prefer [Symbol]
       # @return [Pitch]
       def transpose(semitones_or_interval, prefer: :sharp)
+        validate_transpose_preference!(prefer)
+
         target_midi = to_midi + normalize_semitones(semitones_or_interval)
         raise RangeError, "MIDI pitch out of range: #{target_midi}" unless MIDI_RANGE.cover?(target_midi)
 
@@ -193,6 +196,12 @@ module Clef
         return if (-2..2).cover?(alteration)
 
         raise ArgumentError, "alteration must be between -2 and 2"
+      end
+
+      def validate_transpose_preference!(prefer)
+        return if TRANSPOSE_PREFERENCES.include?(prefer)
+
+        raise ArgumentError, "transpose prefer must be :sharp or :flat"
       end
     end
   end

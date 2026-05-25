@@ -194,6 +194,25 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(%w[la la la la])
   end
 
+  it "renders lyrics attached to tuplet notes" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 4
+        voice :lead do
+          tuplet 3, 2 do
+            notes "c'8 d'8 e'8"
+          end
+        end
+        lyrics :lead, "tri o let"
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='tuplet']").map(&:text)).to include("3")
+    expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(%w[tri o let])
+  end
+
   it "renders beams, flags, ties, and slurs" do
     score = Clef.score do
       staff :melody do

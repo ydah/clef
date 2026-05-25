@@ -43,6 +43,12 @@ RSpec.describe Clef::Core::Pitch do
       expect(described_class.new(:c, 4).transpose(1, prefer: :flat).to_lilypond).to eq("des'")
     end
 
+    it "rejects unknown transposition spelling preferences" do
+      expect do
+        described_class.new(:c, 4).transpose(1, prefer: :neutral)
+      end.to raise_error(ArgumentError, /prefer/)
+    end
+
     it "checks enharmonic equivalence" do
       c_sharp = described_class.new(:c, 4, alteration: 1)
       d_flat = described_class.new(:d, 4, alteration: -1)
