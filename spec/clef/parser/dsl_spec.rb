@@ -251,4 +251,14 @@ RSpec.describe Clef::Parser::DSL do
       end
     end.to raise_error(Clef::Parser::DSL::Error, /invalid DSL method/)
   end
+
+  it "includes token locations in play parse errors" do
+    expect do
+      Clef.score do
+        staff :melody do
+          play "\\unknown c'4"
+        end
+      end
+    end.to raise_error(Clef::Parser::DSL::Error, /'\\unknown' at line 1, column 1/)
+  end
 end

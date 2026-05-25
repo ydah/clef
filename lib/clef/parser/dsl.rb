@@ -284,29 +284,35 @@ module Clef
         private
 
         def parse_tokens(input)
-          Clef::Parser::LilypondLexer.new.tokenize(input)
+          Clef::Parser::LilypondLexer.new.tokenize_with_locations(input)
         end
 
         def add_token(token)
-          token = token.to_s
-          return if token == "|"
-          return start_slur if token == "("
-          return end_slur if token == ")"
-          return start_beam if token == "["
-          return end_beam if token == "]"
-          return tie_next if token == "~"
-          return add_pending_articulation(token) if articulation_token?(token)
-          return add_command_token(token) if token.start_with?("\\")
+          value = token.to_s
+          return if value == "|"
+          return start_slur if value == "("
+          return end_slur if value == ")"
+          return start_beam if value == "["
+          return end_beam if value == "]"
+          return tie_next if value == "~"
+          return add_pending_articulation(value) if articulation_token?(value)
+          return add_command_token(value) if value.start_with?("\\")
 
-          if token.start_with?("r")
-            add_rest_token(token)
-          elsif token.start_with?("<")
-            add_chord_token(token)
+          if value.start_with?("r")
+            add_rest_token(value)
+          elsif value.start_with?("<")
+            add_chord_token(value)
           else
-            add_note_token(token)
+            add_note_token(value)
           end
         rescue => e
-          raise Error, "failed to parse token '#{token}': #{e.message}"
+          raise Error, "failed to parse token '#{value}'#{token_location(token)}: #{e.message}"
+        end
+
+        def token_location(token)
+          return "" unless token.respond_to?(:line) && token.respond_to?(:column)
+
+          " at line #{token.line}, column #{token.column}"
         end
 
         def add_rest_token(token)
