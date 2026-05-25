@@ -1,6 +1,6 @@
 # Clef
 
-Clef is a lightweight Ruby toolkit for building small music scores, importing a practical LilyPond subset, and exporting PDF, SVG, or MIDI.
+Clef is a lightweight Ruby toolkit for building small music scores, parsing a practical LilyPond-style syntax subset, and exporting PDF, SVG, or MIDI.
 
 It is intended for concise notation workflows, examples, and application embedding. It is not a full replacement for LilyPond, MusicXML, or a publishing-grade engraving engine.
 
@@ -101,7 +101,7 @@ score = Clef.score do
 end
 ```
 
-## LilyPond Import
+## LilyPond-Style Input
 
 Clef can parse a practical subset of LilyPond-style input:
 

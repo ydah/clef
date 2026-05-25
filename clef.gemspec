@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email = ["t.yudai92@gmail.com"]
 
   spec.summary = "Ruby toolkit for building small scores and exporting PDF, SVG, or MIDI."
-  spec.description = "Clef provides a Ruby DSL, LilyPond-like note input, and basic LilyPond parsing for modeling simple scores and exporting them to PDF, SVG, or MIDI."
+  spec.description = "Clef provides a Ruby DSL, LilyPond-style note input, and a small LilyPond-style syntax parser for modeling simple scores and exporting them to PDF, SVG, or MIDI."
   spec.homepage = "https://github.com/ydah/clef"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
