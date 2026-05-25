@@ -14,6 +14,11 @@ module Clef
         @beat_unit = beat_unit
         @bpm = bpm
       end
+
+      # @return [Rational]
+      def length
+        Rational(0, 1)
+      end
     end
   end
 end

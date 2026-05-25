@@ -234,6 +234,18 @@ module Clef
           @voice.add(Clef::Core::Chord.new(pitches, duration))
         end
 
+        # @param type [Symbol]
+        def dynamic(type)
+          @voice.add(Clef::Notation::Dynamic.new(type))
+        end
+
+        # @param beat_unit [Symbol, Clef::Core::Duration]
+        # @param bpm [Integer]
+        def tempo(beat_unit:, bpm:)
+          duration = beat_unit.is_a?(Clef::Core::Duration) ? beat_unit : Clef::Core::Duration.new(beat_unit)
+          @voice.add(Clef::Core::Tempo.new(beat_unit: duration, bpm: bpm))
+        end
+
         # @param lilypond_string [String]
         def notes(lilypond_string)
           parse_tokens(lilypond_string).each { |token| add_token(token) }
@@ -265,6 +277,7 @@ module Clef
           return end_beam if token == "]"
           return tie_next if token == "~"
           return add_pending_articulation(token) if articulation_token?(token)
+          return add_command_token(token) if token.start_with?("\\")
 
           if token.start_with?("r")
             add_rest_token(token)
@@ -359,6 +372,13 @@ module Clef
           else
             @pending_articulations << articulation
           end
+        end
+
+        def add_command_token(token)
+          dynamic_name = token.delete_prefix("\\").to_sym
+          return dynamic(dynamic_name) if Clef::Notation::Dynamic::TYPES.include?(dynamic_name)
+
+          raise ArgumentError, "unsupported command token: #{token}"
         end
 
         def consume_articulations

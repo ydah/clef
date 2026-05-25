@@ -13,6 +13,11 @@ module Clef
 
         @type = type
       end
+
+      # @return [Rational]
+      def length
+        Rational(0, 1)
+      end
     end
   end
 end

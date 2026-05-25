@@ -49,6 +49,19 @@ RSpec.describe Clef::Parser::LilypondParser do
     expect(pitches.map(&:to_lilypond)).to eq(["c'", "d'", "e'", "f'"])
   end
 
+  it "imports dynamic commands in note streams" do
+    score = described_class.new.parse("{ \\mf c'4 \\p d'4 }")
+    elements = score.staves.first.measures.first.voices[:default].elements
+
+    expect(elements.map(&:class)).to eq([
+      Clef::Notation::Dynamic,
+      Clef::Core::Note,
+      Clef::Notation::Dynamic,
+      Clef::Core::Note
+    ])
+    expect(elements.values_at(0, 2).map(&:type)).to eq(%i[mf p])
+  end
+
   it "imports a small new StaffGroup subset" do
     lilypond = <<~LY
       \\new StaffGroup <<

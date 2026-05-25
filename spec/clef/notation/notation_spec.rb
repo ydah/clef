@@ -20,4 +20,10 @@ RSpec.describe "notation classes" do
 
     expect(Clef::Notation::Tie.new(note1, note2)).to be_a(Clef::Notation::Tie)
   end
+
+  it "treats dynamics as zero-length markings" do
+    dynamic = Clef::Notation::Dynamic.new(:mf)
+
+    expect(dynamic.length).to eq(Rational(0, 1))
+  end
 end

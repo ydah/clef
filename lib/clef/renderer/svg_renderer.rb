@@ -71,6 +71,8 @@ module Clef
         when Clef::Core::Rest then draw_rest(xml, element, x, baseline)
         when Clef::Core::Chord then draw_chord(xml, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
         when Clef::Core::Tuplet then draw_tuplet(xml, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
+        when Clef::Notation::Dynamic then draw_dynamic(xml, element, x, baseline)
+        when Clef::Core::Tempo then draw_tempo_change(xml, element, x, baseline)
         end
       end
 
@@ -186,6 +188,10 @@ module Clef
                       accidental_state: accidental_state,
                       key_signature: measure.key_signature || staff.key_signature,
                       note_points: note_points)
+        when Clef::Notation::Dynamic
+          draw_dynamic(xml, element, x, baseline)
+        when Clef::Core::Tempo
+          draw_tempo_change(xml, element, x, baseline)
         end
       end
 
@@ -212,6 +218,16 @@ module Clef
           draw_text(xml, rest_label(rest.duration), x: x - 4, y: y, fill: "black", "font-size": 14,
                     class: "rest rest-#{rest.duration.base}")
         end
+      end
+
+      def draw_dynamic(xml, dynamic, x, baseline)
+        draw_text(xml, dynamic_text(dynamic), x: x, y: baseline + (style.staff_space * 6),
+                  class: "dynamic", "font-size": 11, fill: "black", "font-style": "italic")
+      end
+
+      def draw_tempo_change(xml, tempo, x, baseline)
+        draw_text(xml, tempo_text(tempo), x: x, y: baseline - (style.staff_space * 1.5),
+                  class: "tempo-change", "font-size": 10, fill: "black")
       end
 
       def draw_chord(xml, chord, x, baseline, clef, accidental_state:, key_signature:)

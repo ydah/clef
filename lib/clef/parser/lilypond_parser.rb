@@ -4,6 +4,7 @@ module Clef
   module Parser
     class LilypondParser
       SUPPORTED_COMMANDS = %w[\\clef \\key \\major \\minor \\time \\tempo \\relative \\new \\with].freeze
+      DYNAMIC_COMMANDS = Clef::Notation::Dynamic::TYPES.map { |type| "\\#{type}" }.freeze
       STAFF_COMMAND = /\\new\s+(?:Staff|PianoStaff|StaffGroup)/.freeze
 
       attr_reader :warnings, :plugins
@@ -118,7 +119,9 @@ module Clef
       def note_stream(input, context:)
         body = context.match?(/\\relative\b/) ? relativize_body(context, input) : input
         tokens = LilypondLexer.new.tokenize(body)
-        tokens.select { |token| token.match?(/\A<|\A[a-g]|\Ar|\A\||\A[()~\[\]]|\A(?:--|->|-\.)\z/) }.join(" ")
+        tokens.select do |token|
+          token.match?(/\A<|\A[a-g]|\Ar|\A\||\A[()~\[\]]|\A(?:--|->|-\.)\z/) || DYNAMIC_COMMANDS.include?(token)
+        end.join(" ")
       end
 
       def extract_key_tonic(input)
@@ -157,7 +160,7 @@ module Clef
 
       def unsupported_command_warnings(input)
         LilypondLexer.new.tokenize(input).grep(/\A\\/).uniq.filter_map do |command|
-          next if SUPPORTED_COMMANDS.include?(command)
+          next if SUPPORTED_COMMANDS.include?(command) || DYNAMIC_COMMANDS.include?(command)
 
           "unsupported LilyPond command ignored: #{command}"
         end

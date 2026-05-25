@@ -50,7 +50,7 @@ module Clef
       def append_tempo_track(sequence)
         track = Track.new(sequence)
         sequence.tracks << track
-        track.events << Tempo.new(Tempo.bpm_to_mpq(quarter_note_bpm))
+        write_tempo_events(track)
       end
 
       def append_staff_tracks(sequence)
@@ -80,11 +80,11 @@ module Clef
       end
 
       def collect_voice_events(voice, start_time, channel)
-        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {})
+        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, { velocity: DEFAULT_VELOCITY })
         events
       end
 
-      def collect_elements(elements, start_time, channel, ratio, pending_ties)
+      def collect_elements(elements, start_time, channel, ratio, pending_ties, playback_state)
         cursor = start_time
         events = []
         elements.each do |element|
@@ -92,26 +92,36 @@ module Clef
           when Clef::Core::Rest
             cursor += element.length * ratio
           when Clef::Core::Note
-            events.concat(schedule_note(element, cursor, channel, ratio, pending_ties))
+            events.concat(schedule_note(element, cursor, channel, ratio, pending_ties, playback_state))
             cursor += element.length * ratio
           when Clef::Core::Chord
-            events.concat(schedule_chord(element, cursor, channel, ratio))
+            events.concat(schedule_chord(element, cursor, channel, ratio, playback_state))
             cursor += element.length * ratio
           when Clef::Core::Tuplet
-            nested_events, = collect_elements(element.elements, cursor, channel, ratio * element.ratio, pending_ties)
+            nested_events, = collect_elements(element.elements, cursor, channel, ratio * element.ratio,
+                                             pending_ties, playback_state)
             events.concat(nested_events)
             cursor += element.length * ratio
+          when Clef::Notation::Dynamic
+            playback_state[:velocity] = velocity_for_dynamic(element)
+          when Clef::Core::Tempo
+            cursor += element.length
           end
         end
         events.concat(flush_pending_ties(pending_ties, channel))
         [events, cursor]
       end
 
-      def schedule_note(note, start_time, channel, ratio, pending_ties)
+      def schedule_note(note, start_time, channel, ratio, pending_ties, playback_state)
         duration = note.length * ratio
         midi = note.pitch.to_midi
         if note.tie_state == :start || note.tie_state == :continue
-          pending = pending_ties[midi] ||= { start_time: start_time, duration: Rational(0, 1), note: note }
+          pending = pending_ties[midi] ||= {
+            start_time: start_time,
+            duration: Rational(0, 1),
+            note: note,
+            velocity: playback_state[:velocity]
+          }
           pending[:duration] += duration
           return []
         end
@@ -119,31 +129,32 @@ module Clef
         if note.tie_state == :stop && pending_ties.key?(midi)
           pending = pending_ties.delete(midi)
           pending[:duration] += duration
-          return [note_event(pending[:note], pending[:start_time], pending[:duration], channel)]
+          return [note_event(pending[:note], pending[:start_time], pending[:duration], channel, pending[:velocity])]
         end
 
-        [note_event(note, start_time, effective_note_length(note, duration), channel)]
+        [note_event(note, start_time, effective_note_length(note, duration), channel, playback_state[:velocity])]
       end
 
-      def schedule_chord(chord, start_time, channel, ratio)
+      def schedule_chord(chord, start_time, channel, ratio, playback_state)
         duration = chord.length * ratio
         chord.pitches.map do |pitch|
-          { start_time: start_time, duration: duration, pitch: pitch.to_midi, velocity: DEFAULT_VELOCITY, channel: channel }
+          { start_time: start_time, duration: duration, pitch: pitch.to_midi,
+            velocity: playback_state[:velocity], channel: channel }
         end
       end
 
       def flush_pending_ties(pending_ties, channel)
         pending_ties.values.map do |pending|
-          note_event(pending[:note], pending[:start_time], pending[:duration], channel)
+          note_event(pending[:note], pending[:start_time], pending[:duration], channel, pending[:velocity])
         end.tap { pending_ties.clear }
       end
 
-      def note_event(note, start_time, duration, channel)
+      def note_event(note, start_time, duration, channel, base_velocity)
         {
           start_time: start_time,
           duration: duration,
           pitch: note.pitch.to_midi,
-          velocity: velocity_for(note),
+          velocity: velocity_for(note, base_velocity),
           channel: channel
         }
       end
@@ -173,10 +184,70 @@ module Clef
         duration
       end
 
-      def velocity_for(note)
+      def velocity_for(note, base_velocity)
         return 112 if note.articulations.include?(:accent) || note.articulations.include?(:marcato)
 
-        DEFAULT_VELOCITY
+        base_velocity
+      end
+
+      def velocity_for_dynamic(dynamic)
+        {
+          pp: 36,
+          p: 48,
+          mp: 64,
+          mf: 80,
+          f: 96,
+          ff: 112,
+          fff: 120,
+          sfz: 120,
+          fp: 96,
+          cresc: 88,
+          dim: 64
+        }.fetch(dynamic.type)
+      end
+
+      def write_tempo_events(track)
+        events = ([[Rational(0, 1), quarter_note_bpm]] + collect_score_tempo_events)
+                 .uniq { |time, _bpm| time }
+                 .sort_by(&:first)
+        previous_tick = 0
+        events.each do |time, bpm|
+          tick = ticks_for(time)
+          event = Tempo.new(Tempo.bpm_to_mpq(bpm))
+          event.delta_time = tick - previous_tick
+          track.events << event
+          previous_tick = tick
+        end
+      end
+
+      def collect_score_tempo_events
+        score.staves.flat_map do |staff|
+          measure_start = Rational(0, 1)
+          staff.measures.flat_map do |measure|
+            events = measure.voices.values.flat_map { |voice| collect_tempo_events(voice.elements, measure_start, Rational(1, 1)) }
+            measure_start += measure_length_for(measure)
+            events
+          end
+        end
+      end
+
+      def collect_tempo_events(elements, start_time, ratio)
+        cursor = start_time
+        elements.flat_map do |element|
+          case element
+          when Clef::Core::Rest, Clef::Core::Note, Clef::Core::Chord
+            cursor += element.length * ratio
+            []
+          when Clef::Core::Tuplet
+            nested = collect_tempo_events(element.elements, cursor, ratio * element.ratio)
+            cursor += element.length * ratio
+            nested
+          when Clef::Core::Tempo
+            [[cursor, tempo_to_quarter_bpm(element)]]
+          else
+            []
+          end
+        end
       end
 
       def ticks_for(time)
@@ -193,6 +264,10 @@ module Clef
         tempo = score.tempo
         return 120 unless tempo
 
+        tempo_to_quarter_bpm(tempo)
+      end
+
+      def tempo_to_quarter_bpm(tempo)
         (tempo.bpm * (tempo.beat_unit.length / Clef::Core::Duration.quarter.length)).round
       end
 

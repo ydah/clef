@@ -151,6 +151,8 @@ module Clef
         when Clef::Core::Rest then draw_rest(pdf, element, x, baseline)
         when Clef::Core::Chord then draw_chord(pdf, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
         when Clef::Core::Tuplet then draw_tuplet(pdf, element, x, baseline, clef, accidental_state: {}, key_signature: nil)
+        when Clef::Notation::Dynamic then draw_dynamic(pdf, element, x, baseline)
+        when Clef::Core::Tempo then draw_tempo_change(pdf, element, x, baseline)
         end
       end
 
@@ -412,7 +414,19 @@ module Clef
                       accidental_state: accidental_state,
                       key_signature: measure.key_signature || staff.key_signature,
                       note_points: note_points)
+        when Clef::Notation::Dynamic
+          draw_dynamic(pdf, element, x, baseline)
+        when Clef::Core::Tempo
+          draw_tempo_change(pdf, element, x, baseline)
         end
+      end
+
+      def draw_dynamic(pdf, dynamic, x, baseline)
+        pdf.text_box(dynamic_text(dynamic), at: [x, baseline - (style.staff_space * 6)], size: 9)
+      end
+
+      def draw_tempo_change(pdf, tempo, x, baseline)
+        pdf.text_box(tempo_text(tempo), at: [x, baseline + (style.staff_space * 1.5)], size: 8)
       end
 
       def draw_flag(pdf, note, x, y, clef)

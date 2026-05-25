@@ -7,4 +7,10 @@ RSpec.describe Clef::Core::Tempo do
     expect(tempo.bpm).to eq(108)
     expect(tempo.beat_unit).to eq(Clef::Core::Duration.quarter)
   end
+
+  it "has zero musical length" do
+    tempo = described_class.new(beat_unit: Clef::Core::Duration.quarter, bpm: 108)
+
+    expect(tempo.length).to eq(Rational(0, 1))
+  end
 end

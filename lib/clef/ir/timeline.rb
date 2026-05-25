@@ -65,7 +65,9 @@ module Clef
 
       # @return [Rational]
       def shortest_duration
-        durations = events.filter_map { |event| event.element.length if event.element.respond_to?(:length) }
+        durations = events.filter_map do |event|
+          event.element.length if event.element.respond_to?(:length) && event.element.length.positive?
+        end
         durations.min || Rational(1, 4)
       end
 

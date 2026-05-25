@@ -180,6 +180,25 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(document.xpath("//*[@class='slur']").length).to eq(1)
   end
 
+  it "renders dynamics and tempo changes" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice do
+          dynamic :mf
+          note "C4", :quarter
+          tempo beat_unit: :quarter, bpm: 90
+          note "D4", :quarter
+        end
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='dynamic']").map(&:text)).to include("mf")
+    expect(document.xpath("//*[@class='tempo-change']").map(&:text)).to include("4 = 90")
+  end
+
   it "renders constrained scores across multiple systems" do
     score = Clef.score do
       staff :melody do

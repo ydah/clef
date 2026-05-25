@@ -80,6 +80,33 @@ RSpec.describe Clef::Midi::Exporter do
     expect(note_offs.last.delta_time).to eq(240)
   end
 
+  it "exports dynamics as note velocity and voice tempo changes on the tempo track" do
+    score = Clef.score do
+      tempo beat_unit: :quarter, bpm: 120
+      staff :melody do
+        time 4, 4
+        voice do
+          dynamic :p
+          note "C4", :quarter
+          tempo beat_unit: :quarter, bpm: 90
+          dynamic :f
+          note "D4", :quarter
+        end
+      end
+    end
+
+    sequence = export_sequence(score)
+    tempos = sequence.tracks[0].events.select { |event| event.is_a?(MIDI::Tempo) }
+    note_ons = sequence.tracks[1].events.select { |event| event.is_a?(MIDI::NoteOn) }
+
+    expect(tempos.map(&:tempo)).to eq([
+      MIDI::Tempo.bpm_to_mpq(120),
+      MIDI::Tempo.bpm_to_mpq(90)
+    ])
+    expect(tempos.map(&:delta_time)).to eq([0, 480])
+    expect(note_ons.map(&:velocity)).to eq([48, 96])
+  end
+
   it "writes to IO objects and validates missing output directories" do
     io = StringIO.new
     described_class.new(simple_score).export(io)

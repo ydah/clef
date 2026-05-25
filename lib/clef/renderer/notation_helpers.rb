@@ -121,6 +121,10 @@ module Clef
         end
       end
 
+      def dynamic_text(dynamic)
+        dynamic.type.to_s
+      end
+
       def flatten_elements(elements)
         elements.flat_map do |element|
           element.is_a?(Clef::Core::Tuplet) ? flatten_elements(element.elements) : element

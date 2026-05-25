@@ -79,6 +79,49 @@ RSpec.describe Clef::Parser::DSL do
     expect(notes[3].beam_end).to be(true)
   end
 
+  it "adds dynamics and voice-level tempo changes as zero-length events" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice do
+          dynamic :mf
+          note "C4", :quarter
+          tempo beat_unit: :quarter, bpm: 90
+          note "D4", :quarter
+        end
+      end
+    end
+
+    voice = score.staves.first.measures.first.voices[:default]
+
+    expect(voice.elements.map(&:class)).to eq([
+      Clef::Notation::Dynamic,
+      Clef::Core::Note,
+      Clef::Core::Tempo,
+      Clef::Core::Note
+    ])
+    expect(voice.total_length).to eq(Rational(1, 2))
+  end
+
+  it "parses dynamic commands in play shorthand" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        play "\\mf c'4 \\p d'4"
+      end
+    end
+
+    elements = score.staves.first.measures.first.voices[:default].elements
+
+    expect(elements.map(&:class)).to eq([
+      Clef::Notation::Dynamic,
+      Clef::Core::Note,
+      Clef::Notation::Dynamic,
+      Clef::Core::Note
+    ])
+    expect(elements.values_at(0, 2).map(&:type)).to eq(%i[mf p])
+  end
+
   it "builds tuplets with scaled total length" do
     score = Clef.score do
       staff :melody do
