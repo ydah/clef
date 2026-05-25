@@ -56,6 +56,11 @@ module Clef
         raise ArgumentError, "unsupported #{mode} key tonic: #{tonic.to_lilypond}"
       end
 
+      # @return [Symbol]
+      def preferred_transpose_spelling
+        (accidentals[:type] == :flat) ? :flat : :sharp
+      end
+
       private
 
       def normalize_tonic(tonic)

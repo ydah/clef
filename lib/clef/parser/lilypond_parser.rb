@@ -180,10 +180,14 @@ module Clef
       end
 
       def unsupported_command_warnings(input)
-        LilypondLexer.new.tokenize(input).grep(/\A\\/).uniq.filter_map do |command|
+        seen = {}
+        LilypondLexer.new.tokenize_with_locations(input).select { |token| token.value.start_with?("\\") }.filter_map do |token|
+          command = token.value
           next if SUPPORTED_COMMANDS.include?(command) || DYNAMIC_COMMANDS.include?(command)
+          next if seen[command]
 
-          "unsupported LilyPond command ignored: #{command}"
+          seen[command] = true
+          "unsupported LilyPond command ignored at line #{token.line}, column #{token.column}: #{command}"
         end
       end
 

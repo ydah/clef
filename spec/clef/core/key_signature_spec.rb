@@ -23,4 +23,9 @@ RSpec.describe Clef::Core::KeySignature do
 
     expect { key_signature.accidentals }.to raise_error(ArgumentError, /unsupported major key tonic/)
   end
+
+  it "exposes a transpose spelling preference" do
+    expect(described_class.new(:g, :major).preferred_transpose_spelling).to eq(:sharp)
+    expect(described_class.new(:bes, :major).preferred_transpose_spelling).to eq(:flat)
+  end
 end

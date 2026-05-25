@@ -92,16 +92,17 @@ module Clef
       end
 
       # @param semitones_or_interval [Integer, #semitones]
-      # @param prefer [Symbol]
+      # @param prefer [Symbol, nil]
+      # @param key_signature [KeySignature, nil]
       # @return [Pitch]
-      def transpose(semitones_or_interval, prefer: :sharp)
-        validate_transpose_preference!(prefer)
+      def transpose(semitones_or_interval, prefer: nil, key_signature: nil)
+        spelling = transpose_preference(prefer, key_signature)
 
         target_midi = to_midi + normalize_semitones(semitones_or_interval)
         raise RangeError, "MIDI pitch out of range: #{target_midi}" unless MIDI_RANGE.cover?(target_midi)
 
         octave = (target_midi / 12) - 1
-        pitch_map = (prefer == :flat) ? MIDI_CLASS_TO_FLAT_PITCH : MIDI_CLASS_TO_PITCH
+        pitch_map = (spelling == :flat) ? MIDI_CLASS_TO_FLAT_PITCH : MIDI_CLASS_TO_PITCH
         note_name, alteration = pitch_map.fetch(target_midi % 12)
         self.class.new(note_name, octave, alteration: alteration)
       end
@@ -202,6 +203,17 @@ module Clef
         return if TRANSPOSE_PREFERENCES.include?(prefer)
 
         raise ArgumentError, "transpose prefer must be :sharp or :flat"
+      end
+
+      def transpose_preference(prefer, key_signature)
+        if prefer
+          validate_transpose_preference!(prefer)
+          return prefer
+        end
+        return :sharp unless key_signature
+        return key_signature.preferred_transpose_spelling if key_signature.is_a?(KeySignature)
+
+        raise ArgumentError, "key_signature must be a Clef::Core::KeySignature"
       end
     end
   end

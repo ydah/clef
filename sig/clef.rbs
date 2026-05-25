@@ -61,6 +61,7 @@ module Clef
 
       def initialize: (Pitch | Symbol | String tonic, ?Symbol mode) -> void
       def accidentals: () -> Hash[Symbol, Symbol | Integer]
+      def preferred_transpose_spelling: () -> Symbol
     end
 
     class Measure
@@ -109,7 +110,7 @@ module Clef
       def to_midi: () -> Integer
       def semitones: () -> Integer
       def to_frequency: (?tuning: Float) -> Float
-      def transpose: (untyped semitones_or_interval, ?prefer: Symbol) -> Pitch
+      def transpose: (untyped semitones_or_interval, ?prefer: Symbol?, ?key_signature: KeySignature?) -> Pitch
       def enharmonic?: (untyped other) -> bool
     end
 

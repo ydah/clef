@@ -37,9 +37,12 @@ RSpec.describe Clef::Parser::LilypondParser do
 
   it "records unsupported command warnings" do
     parser = described_class.new
-    parser.parse("\\unknown { c'1 }")
+    parser.parse(<<~LY)
+      \\clef treble
+      \\unknown { c'1 }
+    LY
 
-    expect(parser.warnings).to include("unsupported LilyPond command ignored: \\unknown")
+    expect(parser.warnings).to include("unsupported LilyPond command ignored at line 2, column 1: \\unknown")
   end
 
   it "supports a small relative pitch subset" do

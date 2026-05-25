@@ -43,6 +43,16 @@ RSpec.describe Clef::Core::Pitch do
       expect(described_class.new(:c, 4).transpose(1, prefer: :flat).to_lilypond).to eq("des'")
     end
 
+    it "uses key signatures to choose transposed spelling" do
+      c4 = described_class.new(:c, 4)
+      flat_key = Clef::Core::KeySignature.new(:bes, :major)
+      sharp_key = Clef::Core::KeySignature.new(:g, :major)
+
+      expect(c4.transpose(1, key_signature: flat_key).to_lilypond).to eq("des'")
+      expect(c4.transpose(1, key_signature: sharp_key).to_lilypond).to eq("cis'")
+      expect(c4.transpose(1, prefer: :sharp, key_signature: flat_key).to_lilypond).to eq("cis'")
+    end
+
     it "rejects unknown transposition spelling preferences" do
       expect do
         described_class.new(:c, 4).transpose(1, prefer: :neutral)

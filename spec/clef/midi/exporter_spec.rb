@@ -165,6 +165,26 @@ RSpec.describe Clef::Midi::Exporter do
     expect(note_off.delta_time).to eq(720)
   end
 
+  it "extends non-final slurred notes for legato playback" do
+    score = Clef.score do
+      staff :melody do
+        time 2, 4
+        play "( c'4 d'4 )"
+      end
+    end
+
+    messages = export_sequence(score).tracks[1].events.select do |event|
+      event.is_a?(MIDI::NoteOn) || event.is_a?(MIDI::NoteOff)
+    end
+
+    expect(messages.map { |event| [event.class, event.note, event.delta_time] }).to eq([
+      [MIDI::NoteOn, 60, 0],
+      [MIDI::NoteOn, 62, 480],
+      [MIDI::NoteOff, 60, 5],
+      [MIDI::NoteOff, 62, 475]
+    ])
+  end
+
   it "exports dynamics as note velocity and voice tempo changes on the tempo track" do
     score = Clef.score do
       tempo beat_unit: :quarter, bpm: 120

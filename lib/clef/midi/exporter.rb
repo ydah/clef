@@ -74,7 +74,7 @@ module Clef
         starts = measure_starts(staff)
         staff.measures.flat_map { |measure| measure.voices.keys }.uniq.flat_map do |voice_id|
           pending_ties = {}
-          playback_state = {velocity: DEFAULT_VELOCITY}
+          playback_state = {velocity: DEFAULT_VELOCITY, slur_depth: 0}
           events = starts.flat_map do |measure, measure_start|
             voice = measure.voices[voice_id]
             next [] unless voice
@@ -103,6 +103,7 @@ module Clef
             cursor += element.length * ratio
           when Clef::Core::Note
             events.concat(schedule_note(element, cursor, channel, ratio, pending_ties, playback_state))
+            advance_slur_state(element, playback_state)
             cursor += element.length * ratio
           when Clef::Core::Chord
             events.concat(schedule_chord(element, cursor, channel, ratio, playback_state))
@@ -142,7 +143,8 @@ module Clef
           return [note_event(pending[:note], pending[:start_time], pending[:duration], channel, pending[:velocity])]
         end
 
-        [note_event(note, start_time, effective_note_length(note, duration), channel, playback_state[:velocity])]
+        [note_event(note, start_time, effective_note_length(note, duration,
+          slurred: legato_slur_note?(note, playback_state)), channel, playback_state[:velocity])]
       end
 
       def schedule_chord(chord, start_time, channel, ratio, playback_state)
@@ -188,11 +190,23 @@ module Clef
         previous_tick
       end
 
-      def effective_note_length(note, duration)
+      def effective_note_length(note, duration, slurred: false)
         return duration * Rational(1, 2) if note.articulations.include?(:staccato)
         return duration * Rational(19, 20) if note.articulations.include?(:tenuto)
+        return duration * Rational(101, 100) if slurred
 
         duration
+      end
+
+      def legato_slur_note?(note, playback_state)
+        (playback_state.fetch(:slur_depth, 0).positive? || note.slur_start) && !note.slur_end
+      end
+
+      def advance_slur_state(note, playback_state)
+        depth = playback_state.fetch(:slur_depth, 0)
+        depth += 1 if note.slur_start
+        depth -= 1 if note.slur_end && depth.positive?
+        playback_state[:slur_depth] = depth
       end
 
       def velocity_for(note, base_velocity)
