@@ -180,11 +180,14 @@ module Clef
         return if rest.kind == :invisible || rest.kind == :spacer
 
         glyph = if smufl_enabled?
-          glyph_table[:"rest_#{rest.duration.base}"] || glyph_table[:rest_quarter]
+          glyph_table[rest_glyph_key(rest.duration)] || glyph_table[:rest_quarter]
         else
           rest_label(rest.duration)
         end
         pdf.text_box(glyph, at: [x, rest_y(rest, baseline)], size: 14)
+        return unless rest.kind == :multi_measure && rest.measures > 1
+
+        pdf.text_box(rest.measures.to_s, at: [x - 2, baseline + style.staff_space], size: 8)
       end
 
       # @param pdf [Prawn::Document]
@@ -615,6 +618,16 @@ module Clef
           sixteenth: 1.4
         }.fetch(rest.duration.base, 1.4)
         baseline - (style.staff_space * offset)
+      end
+
+      def rest_glyph_key(duration)
+        {
+          whole: :rest_whole,
+          half: :rest_half,
+          quarter: :rest_quarter,
+          eighth: :rest_8th,
+          sixteenth: :rest_16th
+        }.fetch(duration.base, :rest_quarter)
       end
 
       def key_signature_y(note_name)

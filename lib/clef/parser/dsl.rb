@@ -59,7 +59,7 @@ module Clef
         def staff(id, name: nil, clef: :treble, &block)
           staff = Clef::Core::Staff.new(id, name: name, clef: Clef::Core::Clef.new(clef))
           evaluate_block(StaffBuilder.new(staff), &block)
-          @default_group.add_staff(staff)
+          score.add_staff(staff)
           staff
         end
 
@@ -117,6 +117,11 @@ module Clef
         # @param denominator [Integer]
         def time(numerator, denominator)
           @staff.time_signature = Clef::Core::TimeSignature.new(numerator, denominator)
+        end
+
+        # @param program [Integer]
+        def instrument(program)
+          @staff.metadata[:midi_program] = program
         end
 
         # @param id [Symbol]

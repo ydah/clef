@@ -293,11 +293,23 @@ module Clef
       end
 
       def instrument_for(staff)
-        instrument_map.fetch(staff.id) { instrument_map.fetch(index_key(staff), DEFAULT_PROGRAM) }
+        program = instrument_map.fetch(staff.id) do
+          instrument_map.fetch(index_key(staff)) do
+            staff.metadata.fetch(:midi_program) { staff.metadata.fetch(:program, DEFAULT_PROGRAM) }
+          end
+        end
+        validate_program!(program)
+        program
       end
 
       def index_key(staff)
         score.staves.index(staff)
+      end
+
+      def validate_program!(program)
+        return if program.is_a?(Integer) && (0..127).cover?(program)
+
+        raise ArgumentError, "MIDI program must be an Integer between 0 and 127"
       end
 
       def write_sequence(sequence, target)

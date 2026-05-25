@@ -56,6 +56,19 @@ RSpec.describe Clef::Midi::Exporter do
     expect(program.program).to eq(40)
   end
 
+  it "uses staff metadata MIDI programs when no exporter override is provided" do
+    score = Clef.score do
+      staff :melody do
+        instrument 41
+        voice { note "C4", :quarter }
+      end
+    end
+
+    program = export_sequence(score).tracks[1].events.find { |event| event.is_a?(MIDI::ProgramChange) }
+
+    expect(program.program).to eq(41)
+  end
+
   it "keeps rests and tied notes in absolute-time scheduling" do
     score = Clef.score do
       staff :melody do
@@ -78,6 +91,22 @@ RSpec.describe Clef::Midi::Exporter do
     expect(note_ons.first.delta_time).to eq(480)
     expect(note_offs.first.delta_time).to eq(960)
     expect(note_offs.last.delta_time).to eq(240)
+  end
+
+  it "keeps dotted note durations in MIDI scheduling" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice do
+          note "C4", :quarter, dots: 1
+          rest :eighth
+        end
+      end
+    end
+
+    note_off = export_sequence(score).tracks[1].events.find { |event| event.is_a?(MIDI::NoteOff) }
+
+    expect(note_off.delta_time).to eq(720)
   end
 
   it "exports dynamics as note velocity and voice tempo changes on the tempo track" do
@@ -128,6 +157,19 @@ RSpec.describe Clef::Midi::Exporter do
     expect(empty_track_end.meta_type).to eq(MIDI::META_TRACK_END)
     expect(rest_track_end.delta_time).to eq(1920)
     expect(empty_track_end.delta_time).to eq(1920)
+  end
+
+  it "preserves multi-measure rest duration without note events" do
+    score = Clef.score do
+      staff :melody do
+        voice { rest :whole, kind: :multi_measure, measures: 3 }
+      end
+    end
+
+    track = export_sequence(score).tracks[1]
+
+    expect(track.events.none? { |event| event.is_a?(MIDI::NoteOn) }).to be(true)
+    expect(track.events.last.delta_time).to eq(5760)
   end
 
   it "writes to IO objects and validates missing output directories" do

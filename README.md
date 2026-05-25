@@ -66,6 +66,7 @@ Clef's main entry point is `Clef.score`.
 - `voice` gives explicit control over notes, rests, and chords
 - `dynamic` adds velocity/rendering markings such as `:p`, `:mf`, and `:f`
 - voice-level `tempo` adds playback and rendering tempo changes
+- `instrument 40` stores a staff-level MIDI program when no exporter override is provided
 - `tuplet(actual, normal)` groups notes with scaled duration
 - `measure` and `bar` give explicit measure control in manual DSL
 - `lyrics` attaches lyric data to a named voice
@@ -95,6 +96,7 @@ end
 ```
 
 Within a `voice` block, manual builders accept scientific pitch strings such as `C4`, `F#3`, and `Bb5`. The shorthand token parser used by `play` and `notes` expects LilyPond-style pitch tokens.
+Rests support visible, invisible, spacer, and multi-measure forms through `rest :whole, kind: :multi_measure, measures: 4`.
 
 `to_pdf`, `to_svg`, and `to_midi` accept a filesystem path or an IO-like object responding to `write`.
 

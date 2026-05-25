@@ -11,6 +11,16 @@ RSpec.describe Clef::Core::Score do
     expect(score.staves.map(&:id)).to eq(%i[soprano bass])
   end
 
+  it "rejects duplicate staff ids added outside the same group" do
+    score = described_class.new
+    group = Clef::Core::StaffGroup.new([Clef::Core::Staff.new(:melody)])
+    score.add_staff_group(group)
+
+    expect do
+      score.add_staff(Clef::Core::Staff.new(:melody))
+    end.to raise_error(ArgumentError, /duplicate staff id/)
+  end
+
   it "validates overflow and underfull measures" do
     score = Clef.score do
       staff :melody do

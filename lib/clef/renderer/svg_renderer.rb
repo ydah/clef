@@ -210,13 +210,14 @@ module Clef
         return if rest.kind == :invisible || rest.kind == :spacer
 
         y = rest_y(rest, baseline)
-        if rest.duration.base == :whole
+        if rest.kind == :multi_measure
+          draw_multi_measure_rest(xml, rest, x, baseline)
+        elsif rest.duration.base == :whole
           xml.rect(x: x - 4, y: y, width: 8, height: 3, fill: "black", class: "rest rest-whole")
         elsif rest.duration.base == :half
           xml.rect(x: x - 4, y: y - style.staff_space, width: 8, height: 3, fill: "black", class: "rest rest-half")
         else
-          draw_text(xml, rest_label(rest.duration), x: x - 4, y: y, fill: "black", "font-size": 14,
-            class: "rest rest-#{rest.duration.base}")
+          draw_shaped_rest(xml, rest, x, y)
         end
       end
 
@@ -326,6 +327,34 @@ module Clef
           else
             draw_text(xml, articulation.to_s, x: x - 4, y: y - 12, fill: "black", "font-size": 6, class: "articulation")
           end
+        end
+      end
+
+      def draw_multi_measure_rest(xml, rest, x, baseline)
+        y = baseline + (style.staff_space * 2)
+        xml.line(x1: x - 12, y1: y, x2: x + 12, y2: y, stroke: "black", "stroke-width": 4,
+          class: "rest rest-multi-measure")
+        draw_text(xml, rest.measures.to_s, x: x, y: baseline - style.staff_space,
+          fill: "black", "font-size": 10, "text-anchor": "middle", class: "rest-count")
+      end
+
+      def draw_shaped_rest(xml, rest, x, y)
+        case rest.duration.base
+        when :quarter
+          xml.path(d: "M #{x} #{y - 12} c -6 5 8 8 0 14 c 6 3 -5 7 0 13",
+            fill: "none", stroke: "black", "stroke-width": 2, class: "rest rest-quarter")
+        when :eighth, :sixteenth
+          xml.path(d: "M #{x} #{y - 12} q 10 4 1 12 l -6 14",
+            fill: "none", stroke: "black", "stroke-width": 2, class: "rest rest-#{rest.duration.base}")
+          xml.path(d: "M #{x + 1} #{y - 4} q 8 4 0 9",
+            fill: "none", stroke: "black", "stroke-width": 1, class: "rest rest-#{rest.duration.base}-flag")
+          if rest.duration.base == :sixteenth
+            xml.path(d: "M #{x - 1} #{y + 2} q 8 4 0 9",
+              fill: "none", stroke: "black", "stroke-width": 1, class: "rest rest-sixteenth-flag")
+          end
+        else
+          draw_text(xml, rest_label(rest.duration), x: x - 4, y: y, fill: "black", "font-size": 14,
+            class: "rest rest-#{rest.duration.base}")
         end
       end
 

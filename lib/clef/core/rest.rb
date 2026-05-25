@@ -22,7 +22,7 @@ module Clef
 
       # @return [Rational]
       def length
-        duration.length
+        duration.length * measures
       end
     end
   end

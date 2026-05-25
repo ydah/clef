@@ -97,7 +97,7 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(circles.length).to eq(6)
   end
 
-  it "draws whole rests differently from non-whole rests" do
+  it "draws rests with duration-specific structures" do
     whole_rest_score = Clef.score do
       staff :melody, clef: :treble do
         time 4, 4
@@ -114,12 +114,47 @@ RSpec.describe Clef::Renderer::SvgRenderer do
         end
       end
     end
+    eighth_rest_score = Clef.score do
+      staff :melody, clef: :treble do
+        time 4, 4
+        voice do
+          rest :eighth
+        end
+      end
+    end
+    sixteenth_rest_score = Clef.score do
+      staff :melody, clef: :treble do
+        time 4, 4
+        voice do
+          rest :sixteenth
+        end
+      end
+    end
 
     whole_doc = render_svg_document(whole_rest_score)
     quarter_doc = render_svg_document(quarter_rest_score)
+    eighth_doc = render_svg_document(eighth_rest_score)
+    sixteenth_doc = render_svg_document(sixteenth_rest_score)
 
     expect(whole_doc.xpath("//xmlns:rect").length).to be > 0
-    expect(quarter_doc.xpath("//xmlns:text").map(&:text)).to include("r")
+    expect(quarter_doc.xpath("//*[contains(@class, 'rest-quarter')]").length).to be > 0
+    expect(eighth_doc.xpath("//*[contains(@class, 'rest-eighth')]").length).to be > 0
+    expect(sixteenth_doc.xpath("//*[contains(@class, 'rest-sixteenth')]").length).to be > 0
+  end
+
+  it "renders multi-measure rests with a count" do
+    score = Clef.score do
+      staff :melody, clef: :treble do
+        voice do
+          rest :whole, kind: :multi_measure, measures: 4
+        end
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='rest rest-multi-measure']").length).to eq(1)
+    expect(document.xpath("//*[@class='rest-count']").map(&:text)).to include("4")
   end
 
   it "renders clef, key signature, time signature, and barlines structurally" do

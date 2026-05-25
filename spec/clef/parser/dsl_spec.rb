@@ -166,6 +166,17 @@ RSpec.describe Clef::Parser::DSL do
     expect(score.staves.first.measures.length).to eq(2)
   end
 
+  it "stores staff MIDI instrument programs" do
+    score = Clef.score do
+      staff :melody do
+        instrument 40
+        play "c'1"
+      end
+    end
+
+    expect(score.staves.first.metadata[:midi_program]).to eq(40)
+  end
+
   it "requires staff_group blocks" do
     expect do
       Clef.score do

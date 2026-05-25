@@ -101,4 +101,22 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     expect(pdf).to have_received(:circle)
     expect(pdf).not_to have_received(:ellipse)
   end
+
+  it "uses duration-specific SMuFL rest glyphs" do
+    glyph_table = Clef::Engraving::GlyphTable.new(glyphs: {
+      rest_quarter: "quarter",
+      rest_8th: "eighth",
+      rest_16th: "sixteenth"
+    })
+    renderer = described_class.new(glyph_table: glyph_table)
+    renderer.instance_variable_set(:@smufl_enabled, true)
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:text_box)
+
+    renderer.draw_rest(pdf, Clef::Core::Rest.new(Clef::Core::Duration.eighth), 100, 100)
+    renderer.draw_rest(pdf, Clef::Core::Rest.new(Clef::Core::Duration.sixteenth), 100, 100)
+
+    expect(pdf).to have_received(:text_box).with("eighth", at: kind_of(Array), size: 14)
+    expect(pdf).to have_received(:text_box).with("sixteenth", at: kind_of(Array), size: 14)
+  end
 end
