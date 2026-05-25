@@ -10,34 +10,276 @@ module Clef
   class Error < StandardError
   end
 
-  module Core
-    class Score
-      attr_accessor title: String?
-      attr_accessor composer: String?
-      attr_accessor tempo: Tempo?
+  class Compiler
+    def initialize: (Core::Score score, ?style: Engraving::Style, ?plugins: Plugins::Registry) -> void
+    def compile_to_pdf: (untyped path) -> untyped
+    def compile_to_svg: (untyped path) -> untyped
+  end
 
-      def to_pdf: (untyped path, **untyped options) -> untyped
-      def to_svg: (untyped path, **untyped options) -> untyped
-      def to_midi: (untyped path, **untyped options) -> untyped
-      def to_format: (untyped path, **untyped options) -> untyped
-      def validate: (?strict: bool) -> ValidationResult
+  module Core
+    class Chord
+      attr_reader pitches: Array[Pitch]
+      attr_reader duration: Duration
+
+      def initialize: (Array[Pitch] pitches, Duration duration) -> void
+      def length: () -> Rational
+      def sorted_pitches: () -> Array[Pitch]
+    end
+
+    class Clef
+      attr_reader type: Symbol
+
+      def initialize: (?Symbol type) -> void
+      def reference_pitch: () -> Pitch
+      def reference_line: () -> Integer
+    end
+
+    class Duration
+      attr_reader base: Symbol
+      attr_reader dots: Integer
+
+      def initialize: (Symbol base, ?dots: Integer) -> void
+      def self.from_lilypond: (Integer number, ?Integer dots) -> Duration
+      def self.whole: () -> Duration
+      def self.half: () -> Duration
+      def self.quarter: () -> Duration
+      def self.eighth: () -> Duration
+      def self.sixteenth: () -> Duration
+      def self.thirty_second: () -> Duration
+      def self.sixty_fourth: () -> Duration
+      def self.one_twenty_eighth: () -> Duration
+      def self.two_fifty_sixth: () -> Duration
+
+      def base_value: () -> Rational
+      def length: () -> Rational
+      def to_lilypond: () -> String
+    end
+
+    class KeySignature
+      attr_reader tonic: Pitch
+      attr_reader mode: Symbol
+
+      def initialize: (Pitch | Symbol | String tonic, ?Symbol mode) -> void
+      def accidentals: () -> Hash[Symbol, Symbol | Integer]
+    end
+
+    class Measure
+      attr_reader number: Integer
+      attr_reader voices: Hash[Symbol, Voice]
+      attr_accessor key_signature: KeySignature?
+      attr_accessor time_signature: TimeSignature?
+      attr_accessor clef: Clef?
+
+      def initialize: (Integer number, ?time_signature: TimeSignature?) -> void
+      def voice: (?Symbol id) { (Voice) -> void } -> Voice
+               | (?Symbol id) -> Voice
+      def overflowing_voice_ids: () -> Array[Symbol]
+      def underfull_voice_ids: () -> Array[Symbol]
+    end
+
+    class Note
+      attr_reader pitch: Pitch
+      attr_reader duration: Duration
+      attr_reader tie_state: Symbol?
+      attr_accessor articulations: Array[Symbol]
+      attr_accessor slur_start: bool
+      attr_accessor slur_end: bool
+      attr_accessor beam_start: bool
+      attr_accessor beam_end: bool
+
+      def initialize: (Pitch pitch, Duration duration, ?articulations: Array[Symbol], ?tied: bool | Symbol?) -> void
+      def length: () -> Rational
+      def tied: () -> bool
+      def tied=: (bool | Symbol? value) -> bool | Symbol?
     end
 
     class Pitch
+      attr_reader note_name: Symbol
+      attr_reader octave: Integer
+      attr_reader alteration: Integer
+
+      def initialize: (Symbol note_name, Integer octave, ?alteration: Integer) -> void
       def self.parse: (String str) -> Pitch
       def self.parse_scientific: (String str) -> Pitch
       def self.parse_any: (String | Symbol | Pitch value) -> Pitch
 
       def to_lilypond: () -> String
       def to_midi: () -> Integer
-      def transpose: (Integer semitones, ?prefer: Symbol) -> Pitch
+      def semitones: () -> Integer
+      def to_frequency: (?tuning: Float) -> Float
+      def transpose: (untyped semitones_or_interval, ?prefer: Symbol) -> Pitch
+      def enharmonic?: (untyped other) -> bool
     end
 
-    class Duration
-      def self.from_lilypond: (Integer number, ?Integer dots) -> Duration
+    class Rest
+      attr_reader duration: Duration
+      attr_reader kind: Symbol
+      attr_reader measures: Integer
 
+      def initialize: (Duration duration, ?kind: Symbol, ?measures: Integer) -> void
       def length: () -> Rational
-      def to_lilypond: () -> String
+    end
+
+    class Score
+      attr_reader staff_groups: Array[StaffGroup]
+      attr_reader metadata: Hash[untyped, untyped]
+      attr_accessor title: String?
+      attr_accessor composer: String?
+      attr_accessor tempo: Tempo?
+      attr_accessor plugins: Plugins::Registry?
+
+      def initialize: (?metadata: Hash[untyped, untyped]) -> void
+      def metadata=: (Hash[untyped, untyped] value) -> Hash[untyped, untyped]
+      def add_staff_group: (StaffGroup staff_group) -> Score
+      def add_staff: (Staff staff) -> Score
+      def staves: () -> Array[Staff]
+      def to_pdf: (untyped path, **untyped options) -> untyped
+      def to_svg: (untyped path, **untyped options) -> untyped
+      def to_midi: (untyped path, **untyped options) -> untyped
+      def to_format: (untyped path, **untyped options) -> untyped
+      def validate: (?strict: bool) -> ValidationResult
+      def validation_warnings: () -> Array[ValidationIssue]
+    end
+
+    class Staff
+      attr_reader id: Symbol
+      attr_reader name: String
+      attr_reader clef: Clef
+      attr_reader measures: Array[Measure]
+      attr_reader metadata: Hash[untyped, untyped]
+      attr_accessor key_signature: KeySignature?
+      attr_accessor time_signature: TimeSignature?
+
+      def initialize: (Symbol id, ?name: String?, ?clef: Clef) -> void
+      def metadata=: (Hash[untyped, untyped] value) -> Hash[untyped, untyped]
+      def add_measure: (Measure measure) -> Staff
+    end
+
+    class StaffGroup
+      attr_reader staves: Array[Staff]
+      attr_reader bracket_type: Symbol
+
+      def initialize: (?Array[Staff] staves, ?bracket_type: Symbol) -> void
+      def add_staff: (Staff staff) -> StaffGroup
+    end
+
+    class Tempo
+      attr_reader beat_unit: Duration
+      attr_reader bpm: Integer
+
+      def initialize: (beat_unit: Duration, bpm: Integer) -> void
+      def length: () -> Rational
+    end
+
+    class TimeSignature
+      attr_reader numerator: Integer
+      attr_reader denominator: Integer
+
+      def initialize: (Integer numerator, Integer denominator) -> void
+      def measure_length: () -> Rational
+    end
+
+    class Tuplet
+      attr_reader actual: Integer
+      attr_reader normal: Integer
+      attr_reader elements: Array[Note | Rest | Chord | Tuplet]
+
+      def initialize: (Integer actual, Integer normal, Array[Note | Rest | Chord | Tuplet] elements) -> void
+      def length: () -> Rational
+      def ratio: () -> Rational
+    end
+
+    class ValidationIssue
+      attr_accessor severity: Symbol
+      attr_accessor message: String
+      attr_accessor path: Array[untyped]
+
+      def warning?: () -> bool
+      def error?: () -> bool
+    end
+
+    class ValidationResult
+      attr_reader issues: Array[ValidationIssue]
+
+      def initialize: (?Array[ValidationIssue] issues) -> void
+      def ok?: () -> bool
+      def errors: () -> Array[ValidationIssue]
+      def warnings: () -> Array[ValidationIssue]
+    end
+
+    class Voice
+      attr_reader id: Symbol
+      attr_reader elements: Array[untyped]
+
+      def initialize: (?id: Symbol) -> void
+      def add: (untyped element) -> Voice
+      def total_length: () -> Rational
+    end
+  end
+
+  module Midi
+    class Exporter
+      attr_reader score: Core::Score
+      attr_reader ppqn: Integer
+      attr_reader instrument_map: Hash[untyped, untyped]
+      attr_reader plugins: Plugins::Registry
+
+      def initialize: (Core::Score score, ?channel_map: ChannelMap, ?ppqn: Integer, ?instrument_map: Hash[untyped, untyped], ?plugins: Plugins::Registry) -> void
+      def export: (untyped target) -> untyped
+    end
+  end
+
+  module Notation
+    class Lyric
+      attr_reader voice_id: Symbol
+      attr_reader text: String
+      attr_reader syllables: Array[String]
+
+      def initialize: (Symbol voice_id, String text) -> void
+      def note_slot_count: () -> Integer
+      def self.note_syllable?: (String syllable) -> bool
+      def self.hyphen?: (String syllable) -> bool
+      def self.extender?: (String syllable) -> bool
+    end
+  end
+
+  module Parser
+    class LilypondParser
+      attr_reader warnings: Array[String]
+      attr_reader plugins: Plugins::Registry
+
+      def initialize: (?plugins: Plugins::Registry) -> void
+      def parse: (String input) -> Core::Score
+    end
+
+    module DSL
+      class Error < StandardError
+      end
+
+      class ScoreBuilder
+        attr_reader score: Core::Score
+      end
+    end
+  end
+
+  module Plugins
+    class Base
+    end
+
+    class Registry
+      attr_reader errors: Array[Hash[Symbol, untyped]]
+
+      def initialize: (?error_policy: Symbol) -> void
+      def plugins: () -> Array[Base]
+      def register: (Class | Base plugin_or_class, *untyped args, ?priority: Integer, **untyped kwargs) -> Base
+      def unregister: (Class | Base | String | Symbol plugin_or_class) -> Base?
+      def clear: () -> Array[untyped]
+      def run_hook: (Symbol hook_name, *untyped args) -> Array[untyped]
+    end
+  end
+
+  module Engraving
+    class Style
     end
   end
 end
