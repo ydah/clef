@@ -18,4 +18,13 @@ RSpec.describe Clef::Core::Measure do
 
     expect(measure.underfull_voice_ids).to eq([:default])
   end
+
+  it "does not expose the mutable voice store" do
+    measure = described_class.new(1)
+    measure.voice(:default)
+
+    expect(measure.voices).to be_frozen
+    expect { measure.voices[:other] = Clef::Core::Voice.new(id: :other) }.to raise_error(FrozenError)
+    expect(measure.voices.keys).to eq([:default])
+  end
 end

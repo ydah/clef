@@ -100,4 +100,15 @@ RSpec.describe Clef::Core::Score do
 
     expect(score.metadata[:title]).to eq("Sketch")
   end
+
+  it "does not expose mutable staff group collections" do
+    score = described_class.new
+    score.add_staff(Clef::Core::Staff.new(:melody))
+
+    expect(score.staff_groups).to be_frozen
+    expect(score.staves).to be_frozen
+    expect { score.staff_groups << Clef::Core::StaffGroup.new }.to raise_error(FrozenError)
+    expect { score.staves << Clef::Core::Staff.new(:bass) }.to raise_error(FrozenError)
+    expect(score.staves.map(&:id)).to eq([:melody])
+  end
 end

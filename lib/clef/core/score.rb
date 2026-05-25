@@ -3,7 +3,7 @@
 module Clef
   module Core
     class Score
-      attr_reader :staff_groups, :metadata
+      attr_reader :metadata
       attr_accessor :title, :composer, :tempo, :plugins
 
       # @param metadata [Hash]
@@ -26,7 +26,7 @@ module Clef
         duplicate = staff_group.staves.find { |staff| staves.any? { |existing| existing.id == staff.id } }
         raise ArgumentError, "duplicate staff id: #{duplicate.id}" if duplicate
 
-        staff_groups << staff_group
+        @staff_groups << staff_group
         self
       end
 
@@ -42,7 +42,12 @@ module Clef
 
       # @return [Array<Staff>]
       def staves
-        staff_groups.flat_map(&:staves)
+        @staff_groups.flat_map(&:staves).freeze
+      end
+
+      # @return [Array<StaffGroup>]
+      def staff_groups
+        @staff_groups.dup.freeze
       end
 
       # @param path [String]
@@ -193,8 +198,8 @@ module Clef
       end
 
       def default_group
-        staff_groups.first || add_staff_group(StaffGroup.new)
-        staff_groups.first
+        @staff_groups.first || add_staff_group(StaffGroup.new)
+        @staff_groups.first
       end
     end
   end

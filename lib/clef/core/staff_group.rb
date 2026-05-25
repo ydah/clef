@@ -5,7 +5,7 @@ module Clef
     class StaffGroup
       BRACKETS = %i[bracket brace none].freeze
 
-      attr_reader :staves, :bracket_type
+      attr_reader :bracket_type
 
       # @param staves [Array<Staff>]
       # @param bracket_type [Symbol]
@@ -21,10 +21,15 @@ module Clef
       # @return [StaffGroup]
       def add_staff(staff)
         raise ArgumentError, "staff must be a Clef::Core::Staff" unless staff.is_a?(Staff)
-        raise ArgumentError, "duplicate staff id: #{staff.id}" if staves.any? { |item| item.id == staff.id }
+        raise ArgumentError, "duplicate staff id: #{staff.id}" if @staves.any? { |item| item.id == staff.id }
 
-        staves << staff
+        @staves << staff
         self
+      end
+
+      # @return [Array<Staff>]
+      def staves
+        @staves.dup.freeze
       end
     end
   end

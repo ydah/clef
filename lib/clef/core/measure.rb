@@ -3,7 +3,7 @@
 module Clef
   module Core
     class Measure
-      attr_reader :number, :voices
+      attr_reader :number
       attr_accessor :key_signature, :time_signature, :clef
 
       # @param number [Integer]
@@ -20,23 +20,28 @@ module Clef
       # @yield [Voice]
       # @return [Voice]
       def voice(id = :default)
-        current = voices[id] ||= Voice.new(id: id)
+        current = @voices[id] ||= Voice.new(id: id)
         yield(current) if block_given?
         current
+      end
+
+      # @return [Hash<Symbol, Voice>]
+      def voices
+        @voices.dup.freeze
       end
 
       # @return [Array<Symbol>]
       def overflowing_voice_ids
         return [] unless time_signature
 
-        voices.filter_map { |id, voice| id if voice.total_length > time_signature.measure_length }
+        @voices.filter_map { |id, voice| id if voice.total_length > time_signature.measure_length }
       end
 
       # @return [Array<Symbol>]
       def underfull_voice_ids
         return [] unless time_signature
 
-        voices.filter_map do |id, voice|
+        @voices.filter_map do |id, voice|
           id if voice.total_length.positive? && voice.total_length < time_signature.measure_length
         end
       end
