@@ -81,7 +81,7 @@ module Clef
       attr_reader pitch: Pitch
       attr_reader duration: Duration
       attr_reader tie_state: Symbol?
-      attr_accessor articulations: Array[Symbol]
+      attr_reader articulations: Array[Symbol]
       attr_accessor slur_start: bool
       attr_accessor slur_end: bool
       attr_accessor beam_start: bool
@@ -91,6 +91,8 @@ module Clef
       def length: () -> Rational
       def tied: () -> bool
       def tied=: (bool | Symbol? value) -> bool | Symbol?
+      def articulations=: (Array[Symbol] values) -> Array[Symbol]
+      def add_articulation: (Symbol articulation) -> Note
     end
 
     class Pitch

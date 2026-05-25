@@ -378,7 +378,7 @@ module Clef
         def add_pending_articulation(token)
           articulation = {"-." => :staccato, "->" => :accent, "--" => :tenuto}.fetch(token)
           if @last_note
-            @last_note.articulations << articulation
+            @last_note.add_articulation(articulation)
           else
             @pending_articulations << articulation
           end

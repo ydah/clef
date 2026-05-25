@@ -12,6 +12,15 @@ RSpec.describe Clef::Core::Chord do
     expect(chord.sorted_pitches).to eq([c4, e4, g4])
   end
 
+  it "keeps the pitch collection immutable after validation" do
+    chord = described_class.new([Clef::Core::Pitch.new(:c, 4)], Clef::Core::Duration.quarter)
+
+    expect(chord.pitches).to be_frozen
+    expect do
+      chord.pitches << Clef::Core::Pitch.new(:d, 4)
+    end.to raise_error(FrozenError)
+  end
+
   it "rejects duplicate pitches" do
     c4 = Clef::Core::Pitch.new(:c, 4)
 

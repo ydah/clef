@@ -11,7 +11,7 @@ module Clef
         validate_pitches!(pitches)
         raise ArgumentError, "duration must be a Clef::Core::Duration" unless duration.is_a?(Duration)
 
-        @pitches = Array(pitches)
+        @pitches = Array(pitches).freeze
         @duration = duration
       end
 

@@ -15,7 +15,7 @@ RSpec.describe Clef::Core::Note do
   it "supports articulations and tie flag" do
     note = described_class.new(pitch, duration, articulations: [:staccato], tied: true)
 
-    note.articulations << :accent
+    note.add_articulation(:accent)
 
     expect(note.articulations).to include(:staccato, :accent)
     expect(note.tied).to be(true)
@@ -32,6 +32,18 @@ RSpec.describe Clef::Core::Note do
   it "rejects unknown articulations" do
     expect do
       described_class.new(pitch, duration, articulations: [:unknown])
+    end.to raise_error(ArgumentError, /unsupported articulations/)
+  end
+
+  it "keeps articulation mutations validated" do
+    note = described_class.new(pitch, duration, articulations: [:staccato])
+
+    expect(note.articulations).to be_frozen
+    expect do
+      note.add_articulation(:unknown)
+    end.to raise_error(ArgumentError, /unsupported articulations/)
+    expect do
+      note.articulations = [:accent, :unknown]
     end.to raise_error(ArgumentError, /unsupported articulations/)
   end
 end

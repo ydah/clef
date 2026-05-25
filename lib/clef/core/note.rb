@@ -7,8 +7,8 @@ module Clef
       TIE_STATES = %i[start continue stop].freeze
 
       attr_reader :pitch, :duration
-      attr_reader :tie_state
-      attr_accessor :articulations, :slur_start, :slur_end, :beam_start, :beam_end
+      attr_reader :articulations, :tie_state
+      attr_accessor :slur_start, :slur_end, :beam_start, :beam_end
 
       # @param pitch [Pitch]
       # @param duration [Duration]
@@ -20,7 +20,7 @@ module Clef
 
         @pitch = pitch
         @duration = duration
-        @articulations = normalize_articulations(articulations)
+        self.articulations = articulations
         @tie_state = normalize_tie_state(tied)
         @slur_start = false
         @slur_end = false
@@ -41,6 +41,18 @@ module Clef
       # @param value [Boolean, Symbol]
       def tied=(value)
         @tie_state = normalize_tie_state(value)
+      end
+
+      # @param values [Array<Symbol>]
+      def articulations=(values)
+        @articulations = normalize_articulations(values).freeze
+      end
+
+      # @param articulation [Symbol]
+      # @return [Note]
+      def add_articulation(articulation)
+        self.articulations = articulations + [articulation]
+        self
       end
 
       private
