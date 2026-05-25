@@ -11,7 +11,7 @@ Clef is a Ruby toolkit for building small scores with a Ruby DSL and exporting t
 - PDF rendering with Prawn
 - SVG rendering with Nokogiri
 - MIDI export with midilib
-- Plugin hooks around layout and rendering
+- Plugin hooks around parsing, layout, rendering, glyph registration, and MIDI export
 
 ## Installation
 
@@ -48,9 +48,10 @@ end
 score.to_pdf("twinkle.pdf")
 score.to_svg("twinkle.svg")
 score.to_midi("twinkle.mid")
+score.to_format("twinkle.svg")
 ```
 
-`title`, `composer`, and `tempo` are stored on the score. The current PDF and SVG renderers focus on staff content, while `tempo` is also used by MIDI export.
+`title`, `composer`, and `tempo` are stored on the score. PDF and SVG render score headers and staff content; MIDI converts the tempo beat unit into quarter-note tempo for playback.
 
 ## DSL Overview
 
@@ -60,7 +61,11 @@ Clef's main entry point is `Clef.score`.
 - `staff_group(:brace)` and `staff_group(:bracket)` group staves in the score model
 - `play` splits measures on `|`
 - `play` and `notes` accept LilyPond-like tokens such as `c'4`, `r8`, and `<c' e' g'>2.`
+- `play` and `notes` inherit the previous duration for tokens such as `c'4 d' e' f'`
+- `play` and `notes` read a small set of ties, articulations, slurs, and beam hints
 - `voice` gives explicit control over notes, rests, and chords
+- `tuplet(actual, normal)` groups notes with scaled duration
+- `measure` and `bar` give explicit measure control in manual DSL
 - `lyrics` attaches lyric data to a named voice
 
 Example:
@@ -89,6 +94,8 @@ end
 
 Within a `voice` block, manual builders accept scientific pitch strings such as `C4`, `F#3`, and `Bb5`. The shorthand token parser used by `play` and `notes` expects LilyPond-style pitch tokens.
 
+`to_pdf`, `to_svg`, and `to_midi` accept a filesystem path or an IO-like object responding to `write`.
+
 ## LilyPond Input
 
 `Clef::Parser::LilypondParser` supports a small subset of LilyPond and turns it into a `Clef::Core::Score`.
@@ -111,7 +118,11 @@ The current parser recognizes:
 - `\clef`
 - `\key` with `\major` or `\minor`
 - `\time`
+- `\tempo`
+- a small `\relative` subset
 - Note, rest, chord, and bar tokens inside `{ ... }`
+
+Unsupported commands are recorded in `parser.warnings`.
 
 ## Plugins
 
@@ -132,13 +143,19 @@ Available hooks:
 - `on_before_layout(score)`
 - `on_after_layout(layout_result)`
 - `on_before_render(renderer)`
+- `on_after_render(path)`
+- `on_after_parse(score)`
+- `on_before_midi(exporter)`
+- `register_glyphs(glyph_table)`
+
+Registries support `register`, `unregister`, `clear`, plugin instances, initializer arguments, priorities, and `:raise`, `:warn`, or `:collect` hook error policies.
 
 ## Current Scope
 
-- PDF and SVG rendering currently cover clefs, key and time metadata, noteheads, rests, stems, accidentals, dots, chords, and simple articulation text.
-- PDF and SVG do not yet render score headers, lyric lines, ties, slurs, beams, or staff-group braces and brackets.
-- PDF, SVG, and MIDI export currently consume the first voice in each measure. The core model and IR can hold multiple voices, but full polyphonic engraving and playback are not wired into the output pipeline yet.
-- The compiler currently computes `Clef::Ir::MusicTree` and `Clef::Layout::Spacing` before rendering. `Clef::Layout::LineBreaker`, `PageBreaker`, and `BeamLayout` exist in the codebase as standalone building blocks and are covered by specs, but they are not yet integrated into PDF or SVG output.
+- PDF and SVG rendering cover score headers, clefs, key and time metadata, noteheads, rests, stems, flags, simple beams, accidentals, natural signs, dots, chords, articulations, lyrics, ties, slurs, and staff-group braces/brackets.
+- PDF, SVG, and MIDI consume all voices in each measure. Engraving is intentionally lightweight and suited to small scores rather than full publishing-grade polyphony.
+- The compiler computes `Clef::Ir::MusicTree`, spacing, line breaks, page breaks, and beam groups before rendering.
+- Validation reports measure overflow errors, underfull warnings, lyric/note count mismatches, duplicate IDs, and MIDI pitch range errors.
 
 ## Development
 
@@ -155,6 +172,8 @@ bundle exec rspec
 bundle exec rake
 ```
 
+The default `rake` task runs specs, Ruby syntax lint, and a gem build smoke test.
+
 Run an example:
 
 ```bash
@@ -165,6 +184,12 @@ Open a console:
 
 ```bash
 bin/console
+```
+
+Run the minimal executable on a Ruby file that evaluates to a `Clef::Core::Score`:
+
+```bash
+bundle exec ruby exe/clef path/to/score.rb score.svg
 ```
 
 ## License

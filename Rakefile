@@ -2,8 +2,23 @@
 
 require "bundler/gem_tasks"
 require "rspec/core/rake_task"
+require "rbconfig"
+require "tmpdir"
 
 RSpec::Core::RakeTask.new(:spec)
+
+desc "Run Ruby syntax checks"
+task :lint do
+  files = FileList["lib/**/*.rb", "spec/**/*.rb", "exe/*", "*.gemspec", "Rakefile"]
+  files.each { |file| sh RbConfig.ruby, "-c", file }
+end
+
+desc "Build the gem into a temporary directory"
+task :build_smoke do
+  Dir.mktmpdir do |dir|
+    sh "gem", "build", "clef.gemspec", "--output", File.join(dir, "clef.gem")
+  end
+end
 
 begin
   require "yard"
@@ -14,4 +29,4 @@ rescue LoadError
   end
 end
 
-task default: :spec
+task default: %i[spec lint build_smoke]

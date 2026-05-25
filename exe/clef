@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "clef"
+
+input, output = ARGV
+unless input && output
+  warn "usage: clef SCORE.rb OUTPUT.{pdf,svg,mid}"
+  exit 64
+end
+
+context = TOPLEVEL_BINDING
+result = eval(File.read(input), context, input)
+score = if result.is_a?(Clef::Core::Score)
+          result
+        elsif context.local_variable_defined?(:score)
+          context.local_variable_get(:score)
+        end
+unless score.is_a?(Clef::Core::Score)
+  warn "input must evaluate to a Clef::Core::Score"
+  exit 65
+end
+
+score.to_format(output)
