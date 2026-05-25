@@ -130,6 +130,12 @@ module Clef
           element.is_a?(Clef::Core::Tuplet) ? flatten_elements(element.elements) : element
         end
       end
+
+      def lyric_elements(elements)
+        flatten_elements(elements).select do |element|
+          element.is_a?(Clef::Core::Note) || element.is_a?(Clef::Core::Chord)
+        end
+      end
     end
   end
 end

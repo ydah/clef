@@ -153,7 +153,7 @@ module Clef
       def lyric_notes(elements)
         elements.flat_map do |element|
           case element
-          when Note then [element]
+          when Note, Chord then [element]
           when Tuplet then lyric_notes(element.elements)
           else []
           end

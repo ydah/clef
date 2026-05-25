@@ -413,6 +413,7 @@ module Clef
           draw_chord(pdf, element, x, baseline, staff.clef,
             accidental_state: accidental_state,
             key_signature: measure.key_signature || staff.key_signature)
+          note_points[element.object_id] = [x, baseline]
         when Clef::Core::Tuplet
           draw_tuplet(pdf, element, x, baseline, staff.clef,
             accidental_state: accidental_state,
@@ -485,8 +486,7 @@ module Clef
       def draw_lyrics(pdf, staff, note_points, baseline)
         Array(staff.metadata[:lyrics]).each do |lyric|
           notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
-            .then { |elements| flatten_elements(elements) }
-            .select { |element| element.is_a?(Clef::Core::Note) }
+            .then { |elements| lyric_elements(elements) }
           lyric.syllables.zip(notes).each do |syllable, note|
             point = note_points[note.object_id]
             next unless syllable && point

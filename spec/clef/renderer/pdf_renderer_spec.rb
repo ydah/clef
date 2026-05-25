@@ -141,6 +141,27 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     expect(pdf).to have_received(:text_box).with("let", hash_including(size: 8, align: :center))
   end
 
+  it "draws lyrics for chord events" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 4
+        voice :lead do
+          chord %w[C4 E4 G4], :quarter
+        end
+        lyrics :lead, "sing"
+      end
+    end
+    staff = score.staves.first
+    chord = staff.measures.first.voices[:lead].elements.first
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:text_box)
+
+    renderer.send(:draw_lyrics, pdf, staff, {chord.object_id => [100, 80]}, 100)
+
+    expect(pdf).to have_received(:text_box).with("sing", hash_including(size: 8, align: :center))
+  end
+
   it "uses duration-specific SMuFL rest glyphs" do
     glyph_table = Clef::Engraving::GlyphTable.new(glyphs: {
       rest_quarter: "quarter",

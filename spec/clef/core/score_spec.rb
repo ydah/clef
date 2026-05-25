@@ -53,6 +53,20 @@ RSpec.describe Clef::Core::Score do
     expect(score.validate.warnings.map(&:message)).not_to include(/lyrics/)
   end
 
+  it "validates lyrics against chord events" do
+    score = Clef.score do
+      staff :melody do
+        time 2, 4
+        voice :lead do
+          chord %w[C4 E4 G4], :half
+        end
+        lyrics :lead, "sing"
+      end
+    end
+
+    expect(score.validate.warnings.map(&:message)).not_to include(/lyrics/)
+  end
+
   it "routes to exporters by file extension" do
     score = described_class.new
 

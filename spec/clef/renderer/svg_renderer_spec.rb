@@ -213,6 +213,23 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(%w[tri o let])
   end
 
+  it "renders lyrics attached to chords" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 4
+        voice :lead do
+          chord %w[C4 E4 G4], :quarter
+        end
+        lyrics :lead, "sing"
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[contains(@class, 'notehead')]").length).to eq(3)
+    expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(["sing"])
+  end
+
   it "renders beams, flags, ties, and slurs" do
     score = Clef.score do
       staff :melody do
