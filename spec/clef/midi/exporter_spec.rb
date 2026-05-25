@@ -69,6 +69,21 @@ RSpec.describe Clef::Midi::Exporter do
     expect(program.program).to eq(41)
   end
 
+  it "routes percussion clef staves to MIDI channel 10" do
+    score = Clef.score do
+      staff :drums, clef: :percussion do
+        voice { note "C4", :quarter }
+      end
+    end
+
+    events = export_sequence(score).tracks[1].events
+    program = events.find { |event| event.is_a?(MIDI::ProgramChange) }
+    note_on = events.find { |event| event.is_a?(MIDI::NoteOn) }
+
+    expect(program.channel).to eq(9)
+    expect(note_on.channel).to eq(9)
+  end
+
   it "keeps rests and tied notes in absolute-time scheduling" do
     score = Clef.score do
       staff :melody do

@@ -4,9 +4,13 @@ module Clef
   module Layout
     class SystemLayout
       System = Struct.new(:page_index, :line_index, :line_top, :start_moment, :end_moment,
-        :position_offset, :staff_offsets, keyword_init: true) do
+        :position_offset, :x_origin, :y_origin, :staff_offsets, keyword_init: true) do
         def staff_offset(staff_id)
           staff_offsets.fetch(staff_id)
+        end
+
+        def staff_origin(staff_id)
+          [x_origin, y_origin + staff_offset(staff_id)]
         end
 
         def include_moment?(moment)
@@ -49,6 +53,8 @@ module Clef
           start_moment: start_moment,
           end_moment: end_moment,
           position_offset: positions.fetch(start_moment, 0.0),
+          x_origin: -positions.fetch(start_moment, 0.0),
+          y_origin: line_index * system_height,
           staff_offsets: staff_offsets
         )
       end

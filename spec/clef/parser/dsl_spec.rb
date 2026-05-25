@@ -49,6 +49,25 @@ RSpec.describe Clef::Parser::DSL do
     expect(elements.first.pitches.map(&:to_lilypond)).to eq(["c'", "e'", "g'"])
   end
 
+  it "builds the same chord model from manual and shorthand DSL" do
+    manual = Clef.score do
+      staff :melody do
+        voice { chord %w[C4 E4 G4], :half }
+      end
+    end
+    shorthand = Clef.score do
+      staff :melody do
+        play "<c' e' g'>2"
+      end
+    end
+
+    manual_chord = manual.staves.first.measures.first.voices[:default].elements.first
+    shorthand_chord = shorthand.staves.first.measures.first.voices[:default].elements.first
+
+    expect(shorthand_chord.pitches).to eq(manual_chord.pitches)
+    expect(shorthand_chord.duration).to eq(manual_chord.duration)
+  end
+
   it "inherits the previous duration in play shorthand" do
     score = Clef.score do
       staff :melody do
@@ -164,6 +183,25 @@ RSpec.describe Clef::Parser::DSL do
     end
 
     expect(score.staves.first.measures.length).to eq(2)
+  end
+
+  it "can reopen explicit measures to add another voice" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        measure 1 do
+          voice(:upper) { notes "c'1" }
+        end
+        measure 1 do
+          voice(:lower) { notes "c1" }
+        end
+      end
+    end
+
+    measures = score.staves.first.measures
+
+    expect(measures.length).to eq(1)
+    expect(measures.first.voices.keys).to eq(%i[upper lower])
   end
 
   it "stores staff MIDI instrument programs" do

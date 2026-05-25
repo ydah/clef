@@ -152,7 +152,8 @@ module Clef
 
         # @param number [Integer, nil]
         def measure(number = nil, &block)
-          @current_measure = new_measure(number || @next_measure_number)
+          target_number = number || @next_measure_number
+          @current_measure = existing_measure(target_number) || new_measure(target_number)
           evaluate_block(self, &block)
           @current_measure
         ensure
@@ -173,6 +174,10 @@ module Clef
           return @current_measure if @current_measure
 
           @current_measure = new_measure(@next_measure_number)
+        end
+
+        def existing_measure(number)
+          @staff.measures.find { |measure| measure.number == number }
         end
 
         def new_measure(number)

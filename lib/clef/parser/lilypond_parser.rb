@@ -53,15 +53,14 @@ module Clef
         time_numerator, time_denominator = extract_time(input)
         tempo_unit, tempo_bpm = extract_tempo(input)
         voice_streams = extract_voice_streams(first_braced_body(input), context: input)
+        parser = self
 
         Clef.score(plugins: plugins) do
           tempo beat_unit: tempo_unit, bpm: tempo_bpm if tempo_bpm
           staff :staff1, clef: clef do
             key key_tonic, mode
             time time_numerator, time_denominator
-            voice_streams.each_with_index do |stream, index|
-              voice(index.zero? ? :default : :"voice#{index + 1}") { notes stream }
-            end
+            parser.send(:add_voice_streams, self, voice_streams)
           end
         end
       end
@@ -74,14 +73,36 @@ module Clef
         time_numerator, time_denominator = extract_time(context)
         voice_streams = extract_voice_streams(block[:body], context: context)
         staff_id = :"staff#{index + 1}"
+        parser = self
 
         builder.staff staff_id, clef: clef do
           key key_tonic, mode
           time time_numerator, time_denominator
-          voice_streams.each_with_index do |stream, voice_index|
-            voice(voice_index.zero? ? :default : :"voice#{voice_index + 1}") { notes stream }
+          parser.send(:add_voice_streams, self, voice_streams)
+        end
+      end
+
+      def add_voice_streams(builder, voice_streams)
+        streams = voice_streams.map { |stream| measure_segments(stream) }
+        measure_count = streams.map(&:length).max.to_i
+        measure_count.times do |measure_index|
+          builder.measure(measure_index + 1) do |staff_builder|
+            streams.each_with_index do |segments, voice_index|
+              segment = segments[measure_index]
+              next if segment.to_s.empty?
+
+              staff_builder.voice(voice_id_for(voice_index)) { notes segment }
+            end
           end
         end
+      end
+
+      def measure_segments(stream)
+        stream.to_s.split("|").map(&:strip).reject(&:empty?)
+      end
+
+      def voice_id_for(index)
+        index.zero? ? :default : :"voice#{index + 1}"
       end
 
       def extract_staff_blocks(input)

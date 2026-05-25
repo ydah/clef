@@ -26,6 +26,7 @@ RSpec.describe Clef::Layout::SystemLayout do
     expect(systems.length).to eq(1)
     expect(systems.first.staff_offset(:upper)).to eq(0)
     expect(systems.first.staff_offset(:lower)).to eq(Clef::Engraving::Style.default.staff_gap)
+    expect(systems.first.staff_origin(:lower)).to eq([0.0, Clef::Engraving::Style.default.staff_gap])
     expect(systems.first.include_moment?(Clef::Ir::Moment.new(1))).to be(true)
   end
 end

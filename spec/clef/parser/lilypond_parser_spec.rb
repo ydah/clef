@@ -62,6 +62,14 @@ RSpec.describe Clef::Parser::LilypondParser do
     expect(elements.values_at(0, 2).map(&:type)).to eq(%i[mf p])
   end
 
+  it "splits LilyPond bars into measures" do
+    score = described_class.new.parse("\\time 2/4 { c'4 d'4 | e'4 f'4 }")
+    measures = score.staves.first.measures
+
+    expect(measures.map(&:number)).to eq([1, 2])
+    expect(measures.map { |measure| measure.voices[:default].elements.length }).to eq([2, 2])
+  end
+
   it "imports a small new StaffGroup subset" do
     lilypond = <<~LY
       \\new StaffGroup <<
@@ -92,11 +100,35 @@ RSpec.describe Clef::Parser::LilypondParser do
     expect(voices.values.map { |voice| voice.elements.length }).to eq([4, 4])
   end
 
+  it "splits simultaneous voices across matching barlines" do
+    lilypond = <<~LY
+      \\new Staff {
+        \\time 2/4
+        << { c'4 d'4 | e'4 f'4 } { g4 a4 | b4 c'4 } >>
+      }
+    LY
+
+    score = described_class.new.parse(lilypond)
+    measures = score.staves.first.measures
+
+    expect(measures.length).to eq(2)
+    expect(measures.last.voices.keys).to eq(%i[default voice2])
+    expect(measures.last.voices.values.map { |voice| voice.elements.length }).to eq([2, 2])
+  end
+
   it "warns and falls back for unsupported clefs" do
     parser = described_class.new
     score = parser.parse("\\clef unknown { c'1 }")
 
     expect(score.staves.first.clef.type).to eq(:treble)
     expect(parser.warnings).to include("unsupported clef ignored: unknown")
+  end
+
+  it "imports supported clefs without warnings" do
+    parser = described_class.new
+    score = parser.parse("\\clef alto { c'1 }")
+
+    expect(score.staves.first.clef.type).to eq(:alto)
+    expect(parser.warnings).to be_empty
   end
 end
