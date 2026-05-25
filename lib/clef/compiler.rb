@@ -74,7 +74,7 @@ module Clef
       sorted.each_cons(2).map do |(moment, x), (_next_moment, next_x)|
         {moment: moment, x: x, width: [next_x - x, @style.min_note_spacing].max, break_penalty: 0}
       end + sorted.last(1).map do |moment, x|
-        {moment: moment, x: x, width: @style.min_note_spacing, break_penalty: 0}
+        {moment: moment, x: x, width: 0.0, break_penalty: 0}
       end
     end
 

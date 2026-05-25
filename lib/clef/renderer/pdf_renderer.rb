@@ -99,9 +99,12 @@ module Clef
       # @param layout [Hash, nil]
       def draw_measures(pdf, staff, start_x, baseline, positions = nil, layout = nil, system: nil)
         note_points = {}
+        voice_elements = Hash.new { |hash, key| hash[key] = [] }
         measure_start = Clef::Ir::Moment.new(0)
         staff.measures.each do |measure|
-          note_points.merge!(draw_measure(pdf, measure, staff, start_x, baseline, measure_start, positions, layout, system: system))
+          measure_points, measure_voice_elements = draw_measure(pdf, measure, staff, start_x, baseline, measure_start, positions, layout, system: system)
+          note_points.merge!(measure_points)
+          measure_voice_elements.each { |voice_id, elements| voice_elements[voice_id].concat(elements) }
           bar_moment = measure_start + measure_length_for(measure)
           if system.nil? || system.include_moment?(bar_moment)
             bar_x = x_for_moment(positions, bar_moment, start_x, position_offset: system&.position_offset)
@@ -109,6 +112,7 @@ module Clef
           end
           measure_start += measure_length_for(measure)
         end
+        voice_elements.each_value { |elements| draw_note_connections(pdf, elements, note_points) }
         note_points
       end
 
@@ -123,8 +127,10 @@ module Clef
       # @return [Hash]
       def draw_measure(pdf, measure, staff, start_x, baseline, measure_start = Clef::Ir::Moment.new(0), positions = nil, layout = nil, system: nil)
         note_points = {}
+        voice_elements = {}
         accidental_state = {}
         measure.voices.each_with_index do |(voice_id, voice), index|
+          voice_elements[voice_id] = voice.elements
           cursor = Clef::Ir::Moment.new(measure_start.value)
           voice_baseline = baseline + voice_vertical_offset(index)
           voice.elements.each do |element|
@@ -135,9 +141,8 @@ module Clef
             cursor += element.length
           end
           draw_beams(pdf, layout, staff, measure, voice_id, note_points)
-          draw_note_connections(pdf, voice.elements, note_points)
         end
-        note_points
+        [note_points, voice_elements]
       end
 
       # @param pdf [Prawn::Document]

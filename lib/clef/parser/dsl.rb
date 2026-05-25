@@ -138,9 +138,11 @@ module Clef
         # @param lilypond_string [String]
         def play(lilypond_string)
           segments = split_measures(lilypond_string)
+          voice_builder = nil
           segments.each_with_index do |segment, idx|
             measure = ensure_measure
-            VoiceBuilder.new(measure.voice(:default)).notes(segment)
+            voice_builder ||= VoiceBuilder.new(measure.voice(:default))
+            voice_builder.use_voice(measure.voice(:default)).notes(segment)
             validate_measure_overflow!(measure)
             advance_measure if idx < segments.length - 1
           end
@@ -216,6 +218,13 @@ module Clef
           @open_slur = false
           @open_beam = false
           @last_note = nil
+        end
+
+        # @param voice [Clef::Core::Voice]
+        # @return [VoiceBuilder]
+        def use_voice(voice)
+          @voice = voice
+          self
         end
 
         # @param pitch_str [String]

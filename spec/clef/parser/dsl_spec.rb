@@ -80,6 +80,24 @@ RSpec.describe Clef::Parser::DSL do
     expect(durations.map(&:to_lilypond)).to eq(%w[4 4 4 4])
   end
 
+  it "preserves play shorthand state across barlines" do
+    score = Clef.score do
+      staff :melody do
+        time 1, 8
+        play "( c'8~ | c' )"
+      end
+    end
+
+    first_note = score.staves.first.measures[0].voices[:default].elements.first
+    second_note = score.staves.first.measures[1].voices[:default].elements.first
+
+    expect(first_note.tie_state).to eq(:start)
+    expect(first_note.slur_start).to be(true)
+    expect(second_note.duration.to_lilypond).to eq("8")
+    expect(second_note.tie_state).to eq(:stop)
+    expect(second_note.slur_end).to be(true)
+  end
+
   it "parses ties, articulations, slurs, and beam hints lightly" do
     score = Clef.score do
       staff :melody do

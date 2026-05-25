@@ -71,19 +71,26 @@ module Clef
       end
 
       def collect_staff_note_events(staff, channel)
-        measure_start = Rational(0, 1)
-        staff.measures.flat_map do |measure|
-          events = measure.voices.values.flat_map do |voice|
-            collect_voice_events(voice, measure_start, channel)
+        starts = measure_starts(staff)
+        staff.measures.flat_map { |measure| measure.voices.keys }.uniq.flat_map do |voice_id|
+          pending_ties = {}
+          playback_state = {velocity: DEFAULT_VELOCITY}
+          events = starts.flat_map do |measure, measure_start|
+            voice = measure.voices[voice_id]
+            next [] unless voice
+
+            collect_voice_events(voice, measure_start, channel,
+              pending_ties: pending_ties,
+              playback_state: playback_state,
+              flush_ties: false)
           end
-          measure_start += measure_length_for(measure)
-          events
+          events + flush_pending_ties(pending_ties, channel)
         end
       end
 
-      def collect_voice_events(voice, start_time, channel)
-        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, {velocity: DEFAULT_VELOCITY},
-          flush_ties: true)
+      def collect_voice_events(voice, start_time, channel, pending_ties: {}, playback_state: {velocity: DEFAULT_VELOCITY}, flush_ties: true)
+        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), pending_ties, playback_state,
+          flush_ties: flush_ties)
         events
       end
 
@@ -232,11 +239,18 @@ module Clef
 
       def collect_score_tempo_events
         score.staves.flat_map do |staff|
-          measure_start = Rational(0, 1)
-          staff.measures.flat_map do |measure|
+          measure_starts(staff).flat_map do |measure, measure_start|
             events = measure.voices.values.flat_map { |voice| collect_tempo_events(voice.elements, measure_start, Rational(1, 1)) }
-            measure_start += measure_length_for(measure)
             events
+          end
+        end
+      end
+
+      def measure_starts(staff)
+        measure_start = Rational(0, 1)
+        staff.measures.map do |measure|
+          [measure, measure_start].tap do
+            measure_start += measure_length_for(measure)
           end
         end
       end

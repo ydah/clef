@@ -132,6 +132,23 @@ RSpec.describe Clef::Midi::Exporter do
     expect(note_offs.first.delta_time).to eq(640)
   end
 
+  it "keeps ties pending across measure boundaries" do
+    score = Clef.score do
+      staff :melody do
+        time 2, 4
+        play "c'2~ | c'2"
+      end
+    end
+
+    events = export_sequence(score).tracks[1].events
+    note_ons = events.select { |event| event.is_a?(MIDI::NoteOn) }
+    note_offs = events.select { |event| event.is_a?(MIDI::NoteOff) }
+
+    expect(note_ons.map(&:note)).to eq([60])
+    expect(note_ons.first.delta_time).to eq(0)
+    expect(note_offs.first.delta_time).to eq(1920)
+  end
+
   it "keeps dotted note durations in MIDI scheduling" do
     score = Clef.score do
       staff :melody do

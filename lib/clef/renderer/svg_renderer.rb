@@ -137,10 +137,12 @@ module Clef
 
       def draw_measures(xml, staff, start_x, baseline, positions, layout, system: nil)
         note_points = {}
+        voice_elements = Hash.new { |hash, key| hash[key] = [] }
         measure_start = Clef::Ir::Moment.new(0)
         staff.measures.each do |measure|
-          measure_points = draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout, system: system)
+          measure_points, measure_voice_elements = draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout, system: system)
           note_points.merge!(measure_points)
+          measure_voice_elements.each { |voice_id, elements| voice_elements[voice_id].concat(elements) }
           bar_moment = measure_start + measure_length_for(measure)
           if system.nil? || system.include_moment?(bar_moment)
             bar_x = x_for_moment(positions, bar_moment, start_x, position_offset: system&.position_offset)
@@ -148,13 +150,16 @@ module Clef
           end
           measure_start += measure_length_for(measure)
         end
+        voice_elements.each_value { |elements| draw_note_connections(xml, elements, note_points) }
         note_points
       end
 
       def draw_measure(xml, measure, staff, start_x, baseline, measure_start, positions, layout, system: nil)
         note_points = {}
+        voice_elements = {}
         accidental_state = {}
         measure.voices.each_with_index do |(voice_id, voice), index|
+          voice_elements[voice_id] = voice.elements
           voice_offset = voice_vertical_offset(index)
           cursor = Clef::Ir::Moment.new(measure_start.value)
           voice.elements.each do |element|
@@ -165,9 +170,8 @@ module Clef
             cursor += element.length
           end
           draw_beams(xml, layout, staff, measure, voice_id, note_points)
-          draw_note_connections(xml, voice.elements, note_points)
         end
-        note_points
+        [note_points, voice_elements]
       end
 
       def draw_element_with_context(xml, element, x, baseline, staff, measure, accidental_state, note_points)

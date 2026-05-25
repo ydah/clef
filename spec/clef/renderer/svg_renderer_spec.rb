@@ -287,6 +287,24 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(document.xpath("//*[@class='slur']").length).to eq(1)
   end
 
+  it "renders ties across barlines" do
+    score = Clef.score do
+      staff :melody do
+        time 2, 4
+        play "c'2~ | c'2"
+      end
+    end
+
+    document = nil
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "score.svg")
+      Clef::Compiler.new(score).compile_to_svg(path)
+      document = Nokogiri::XML(File.read(path))
+    end
+
+    expect(document.xpath("//*[@class='tie']").length).to eq(1)
+  end
+
   it "renders dynamics and tempo changes" do
     score = Clef.score do
       staff :melody do
