@@ -45,6 +45,26 @@ RSpec.describe Clef::Compiler do
     expect(layout[:beams].dig(:melody, 1, :default).first.length).to eq(4)
   end
 
+  it "includes tuplet notes in beam layout" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice do
+          tuplet 3, 2 do
+            notes "c'8 d'8 e'8"
+          end
+          rest :half
+          rest :quarter
+        end
+      end
+    end
+
+    layout = described_class.new(score).send(:build_layout)
+    beam_group = layout[:beams].dig(:melody, 1, :default).first
+
+    expect(beam_group.map(&:pitch).map(&:to_lilypond)).to eq(%w[c' d' e'])
+  end
+
   it "builds multiple systems and pages when the style is constrained" do
     score = Clef.score do
       staff :melody do

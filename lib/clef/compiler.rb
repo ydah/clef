@@ -116,9 +116,22 @@ module Clef
 
     def measure_beams(measure)
       measure.voices.to_h do |voice_id, voice|
-        notes = voice.elements.select { |element| element.is_a?(Clef::Core::Note) && beamable_duration?(element.duration) }
+        notes = beamable_notes(voice.elements)
         groups = Clef::Layout::BeamLayout.auto_beam(notes, measure.time_signature || Clef::Core::TimeSignature.new(4, 4))
         [voice_id, groups.select { |group| group.length > 1 }]
+      end
+    end
+
+    def beamable_notes(elements)
+      elements.flat_map do |element|
+        case element
+        when Clef::Core::Note
+          beamable_duration?(element.duration) ? [element] : []
+        when Clef::Core::Tuplet
+          beamable_notes(element.elements)
+        else
+          []
+        end
       end
     end
 

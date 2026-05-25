@@ -108,6 +108,30 @@ RSpec.describe Clef::Midi::Exporter do
     expect(note_offs.last.delta_time).to eq(240)
   end
 
+  it "keeps ties pending across tuplet boundaries" do
+    score = Clef.score do
+      staff :melody do
+        time 4, 4
+        voice do
+          tuplet 3, 2 do
+            rest :eighth
+            rest :eighth
+            note "C4", :eighth, tied: :start
+          end
+          note "C4", :quarter, tied: :stop
+        end
+      end
+    end
+
+    events = export_sequence(score).tracks[1].events
+    note_ons = events.select { |event| event.is_a?(MIDI::NoteOn) }
+    note_offs = events.select { |event| event.is_a?(MIDI::NoteOff) }
+
+    expect(note_ons.map(&:note)).to eq([60])
+    expect(note_ons.first.delta_time).to eq(320)
+    expect(note_offs.first.delta_time).to eq(640)
+  end
+
   it "keeps dotted note durations in MIDI scheduling" do
     score = Clef.score do
       staff :melody do

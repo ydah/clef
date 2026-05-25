@@ -82,11 +82,12 @@ module Clef
       end
 
       def collect_voice_events(voice, start_time, channel)
-        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, {velocity: DEFAULT_VELOCITY})
+        events, = collect_elements(voice.elements, start_time, channel, Rational(1, 1), {}, {velocity: DEFAULT_VELOCITY},
+          flush_ties: true)
         events
       end
 
-      def collect_elements(elements, start_time, channel, ratio, pending_ties, playback_state)
+      def collect_elements(elements, start_time, channel, ratio, pending_ties, playback_state, flush_ties:)
         cursor = start_time
         events = []
         elements.each do |element|
@@ -101,7 +102,7 @@ module Clef
             cursor += element.length * ratio
           when Clef::Core::Tuplet
             nested_events, = collect_elements(element.elements, cursor, channel, ratio * element.ratio,
-              pending_ties, playback_state)
+              pending_ties, playback_state, flush_ties: false)
             events.concat(nested_events)
             cursor += element.length * ratio
           when Clef::Notation::Dynamic
@@ -110,7 +111,7 @@ module Clef
             cursor += element.length
           end
         end
-        events.concat(flush_pending_ties(pending_ties, channel))
+        events.concat(flush_pending_ties(pending_ties, channel)) if flush_ties
         [events, cursor]
       end
 
