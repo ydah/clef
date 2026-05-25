@@ -137,12 +137,12 @@ module Clef
             note_count = staff.measures.sum do |measure|
               lyric_notes(Array(measure.voices[lyric.voice_id]&.elements)).length
             end
-            next [] if lyric.syllables.length == note_count
+            next [] if lyric.note_slot_count == note_count
 
             [
               ValidationIssue.new(
                 severity: :warning,
-                message: "lyrics for voice #{lyric.voice_id} have #{lyric.syllables.length} syllables for #{note_count} notes",
+                message: "lyrics for voice #{lyric.voice_id} have #{lyric.note_slot_count} syllables for #{note_count} notes",
                 path: [:staff, staff.id, :lyrics, lyric.voice_id]
               )
             ]

@@ -67,6 +67,20 @@ RSpec.describe Clef::Core::Score do
     expect(score.validate.warnings.map(&:message)).not_to include(/lyrics/)
   end
 
+  it "does not count lyric hyphens as note-consuming syllables" do
+    score = Clef.score do
+      staff :melody do
+        time 2, 4
+        voice :lead do
+          notes "c'4 d'4"
+        end
+        lyrics :lead, "la -- la"
+      end
+    end
+
+    expect(score.validate.warnings.map(&:message)).not_to include(/lyrics/)
+  end
+
   it "routes to exporters by file extension" do
     score = described_class.new
 

@@ -315,10 +315,27 @@ module Clef
             pdf.stroke_line [x - 4, y + 12], [x + 4, y + 12]
           when :accent
             pdf.text_box(">", at: [x - 4, y + 14], size: 9)
+          when :marcato
+            pdf.stroke_line [x - 4, y + 10], [x, y + 16]
+            pdf.stroke_line [x, y + 16], [x + 4, y + 10]
+          when :fermata
+            draw_fermata(pdf, x, y)
           else
             pdf.text_box(articulation.to_s, at: [x - 4, y + 12], size: 6)
           end
         end
+      end
+
+      def draw_fermata(pdf, x, y)
+        if pdf.respond_to?(:stroke_curve)
+          pdf.stroke_curve [x - 7, y + 12], [x + 7, y + 12],
+            bounds: [[x - 5, y + 18], [x + 5, y + 18]]
+        else
+          pdf.stroke_line [x - 7, y + 12], [x, y + 17]
+          pdf.stroke_line [x, y + 17], [x + 7, y + 12]
+        end
+        pdf.circle([x, y + 12], 1.2)
+        pdf.fill
       end
 
       # @param pdf [Prawn::Document]
@@ -485,14 +502,34 @@ module Clef
 
       def draw_lyrics(pdf, staff, note_points, baseline)
         Array(staff.metadata[:lyrics]).each do |lyric|
-          notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
+          elements = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
             .then { |elements| lyric_elements(elements) }
-          lyric.syllables.zip(notes).each do |syllable, note|
-            point = note_points[note.object_id]
-            next unless syllable && point
-
-            pdf.text_box(syllable, at: [point.first - 10, baseline - (style.staff_space * 6)], size: 8, width: 24, align: :center)
+          lyric_events(lyric, elements).each do |event|
+            draw_lyric_event(pdf, event, note_points, baseline)
           end
+        end
+      end
+
+      def draw_lyric_event(pdf, event, note_points, baseline)
+        y = baseline - (style.staff_space * 6)
+        case event[:type]
+        when :text
+          point = note_points[event[:element]&.object_id]
+          return unless point
+
+          pdf.text_box(event[:syllable], at: [point.first - 10, y], size: 8, width: 24, align: :center)
+        when :hyphen
+          from = note_points[event[:from]&.object_id]
+          to = note_points[event[:to]&.object_id]
+          return unless from && to
+
+          pdf.text_box("-", at: [((from.first + to.first) / 2.0) - 4, y], size: 8, width: 8, align: :center)
+        when :extender
+          from = note_points[event[:from]&.object_id]
+          to = note_points[event[:to]&.object_id]
+          return unless from && to
+
+          pdf.stroke_line [from.first + 8, y + 4], [to.first - 8, y + 4]
         end
       end
 

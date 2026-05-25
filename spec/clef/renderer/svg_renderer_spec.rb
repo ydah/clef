@@ -78,6 +78,24 @@ RSpec.describe Clef::Renderer::SvgRenderer do
     expect(circles.length).to eq(2)
   end
 
+  it "renders marcato and fermata articulations as shapes" do
+    score = Clef.score do
+      staff :melody, clef: :treble do
+        time 2, 4
+        voice do
+          note "C4", :quarter, articulations: [:marcato]
+          note "D4", :quarter, articulations: [:fermata]
+        end
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='articulation marcato']").length).to eq(1)
+    expect(document.xpath("//*[@class='articulation fermata']").length).to eq(1)
+    expect(document.xpath("//*[@class='articulation fermata-dot']").length).to eq(1)
+  end
+
   it "draws chord stems and chord accidentals" do
     score = Clef.score do
       staff :melody, clef: :treble do
@@ -228,6 +246,24 @@ RSpec.describe Clef::Renderer::SvgRenderer do
 
     expect(document.xpath("//*[contains(@class, 'notehead')]").length).to eq(3)
     expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(["sing"])
+  end
+
+  it "renders lyric hyphens and extenders without literal continuation text" do
+    score = Clef.score do
+      staff :melody do
+        time 3, 4
+        voice :lead do
+          notes "c'4 d'4 e'4"
+        end
+        lyrics :lead, "sing _ -- on"
+      end
+    end
+
+    document = render_svg_document(score)
+
+    expect(document.xpath("//*[@class='lyric']").map(&:text)).to eq(%w[sing on])
+    expect(document.xpath("//*[@class='lyric-hyphen']").map(&:text)).to eq(["-"])
+    expect(document.xpath("//*[@class='lyric-extender']").length).to eq(1)
   end
 
   it "renders beams, flags, ties, and slurs" do

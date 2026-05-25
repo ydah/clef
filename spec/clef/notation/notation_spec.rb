@@ -11,6 +11,7 @@ RSpec.describe "notation classes" do
     lyric = Clef::Notation::Lyric.new(:voice1, "la-la _ -- lu")
 
     expect(lyric.syllables).to eq(%w[la la _ -- lu])
+    expect(lyric.note_slot_count).to eq(4)
   end
 
   it "validates ties with same pitch" do

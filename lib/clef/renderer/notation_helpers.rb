@@ -136,6 +136,27 @@ module Clef
           element.is_a?(Clef::Core::Note) || element.is_a?(Clef::Core::Chord)
         end
       end
+
+      def lyric_events(lyric, elements)
+        note_index = 0
+        previous_element = nil
+        lyric.syllables.filter_map do |syllable|
+          if Clef::Notation::Lyric.hyphen?(syllable)
+            next {type: :hyphen, from: previous_element, to: elements[note_index]}
+          end
+
+          element = elements[note_index]
+          note_index += 1
+          if Clef::Notation::Lyric.extender?(syllable)
+            event = {type: :extender, from: previous_element, to: element}
+            previous_element = element if element
+            next event
+          end
+
+          previous_element = element if element
+          {type: :text, syllable: syllable, element: element}
+        end
+      end
     end
   end
 end

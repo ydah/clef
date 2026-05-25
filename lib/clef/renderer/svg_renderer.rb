@@ -325,6 +325,13 @@ module Clef
               "stroke-width": 1, class: "articulation tenuto")
           when :accent
             draw_text(xml, ">", x: x - 4, y: y - 10, fill: "black", "font-size": 9, class: "articulation accent")
+          when :marcato
+            xml.path(d: "M #{x - 4} #{y - 10} L #{x} #{y - 15} L #{x + 4} #{y - 10}",
+              fill: "none", stroke: "black", "stroke-width": 1, class: "articulation marcato")
+          when :fermata
+            xml.path(d: "M #{x - 7} #{y - 13} Q #{x} #{y - 20} #{x + 7} #{y - 13}",
+              fill: "none", stroke: "black", "stroke-width": 1, class: "articulation fermata")
+            xml.circle(cx: x, cy: y - 13, r: 1.2, fill: "black", class: "articulation fermata-dot")
           else
             draw_text(xml, articulation.to_s, x: x - 4, y: y - 12, fill: "black", "font-size": 6, class: "articulation")
           end
@@ -394,15 +401,37 @@ module Clef
 
       def draw_lyrics(xml, staff, note_points, baseline)
         Array(staff.metadata[:lyrics]).each do |lyric|
-          notes = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
+          elements = staff.measures.flat_map { |measure| Array(measure.voices[lyric.voice_id]&.elements) }
             .then { |elements| lyric_elements(elements) }
-          lyric.syllables.zip(notes).each do |syllable, note|
-            point = note_points[note.object_id]
-            next unless syllable && point
-
-            draw_text(xml, syllable, x: point.first, y: baseline + (style.staff_space * 6.5),
-              fill: "black", "font-size": 10, "text-anchor": "middle", class: "lyric")
+          lyric_events(lyric, elements).each do |event|
+            draw_lyric_event(xml, event, note_points, baseline)
           end
+        end
+      end
+
+      def draw_lyric_event(xml, event, note_points, baseline)
+        y = baseline + (style.staff_space * 6.5)
+        case event[:type]
+        when :text
+          point = note_points[event[:element]&.object_id]
+          return unless point
+
+          draw_text(xml, event[:syllable], x: point.first, y: y,
+            fill: "black", "font-size": 10, "text-anchor": "middle", class: "lyric")
+        when :hyphen
+          from = note_points[event[:from]&.object_id]
+          to = note_points[event[:to]&.object_id]
+          return unless from && to
+
+          draw_text(xml, "-", x: (from.first + to.first) / 2.0, y: y,
+            fill: "black", "font-size": 10, "text-anchor": "middle", class: "lyric-hyphen")
+        when :extender
+          from = note_points[event[:from]&.object_id]
+          to = note_points[event[:to]&.object_id]
+          return unless from && to
+
+          xml.line(x1: from.first + 8, y1: y - 4, x2: to.first - 8, y2: y - 4,
+            stroke: "black", "stroke-width": 1, class: "lyric-extender")
         end
       end
 

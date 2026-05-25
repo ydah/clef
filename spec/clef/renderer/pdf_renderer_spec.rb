@@ -115,6 +115,22 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     expect(pdf).to have_received(:fill).twice
   end
 
+  it "draws marcato and fermata articulations without text fallback" do
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:stroke_line)
+    allow(pdf).to receive(:circle)
+    allow(pdf).to receive(:fill)
+    allow(pdf).to receive(:text_box)
+
+    renderer.send(:draw_articulations, pdf, %i[marcato fermata], 100, 100)
+
+    expect(pdf).to have_received(:stroke_line).at_least(4).times
+    expect(pdf).to have_received(:circle).with([100, 112], 1.2)
+    expect(pdf).not_to have_received(:text_box).with("marcato", any_args)
+    expect(pdf).not_to have_received(:text_box).with("fermata", any_args)
+  end
+
   it "draws lyrics for notes inside tuplets" do
     score = Clef.score do
       staff :melody do
@@ -160,6 +176,32 @@ RSpec.describe Clef::Renderer::PdfRenderer do
     renderer.send(:draw_lyrics, pdf, staff, {chord.object_id => [100, 80]}, 100)
 
     expect(pdf).to have_received(:text_box).with("sing", hash_including(size: 8, align: :center))
+  end
+
+  it "draws lyric hyphens and extenders" do
+    score = Clef.score do
+      staff :melody do
+        time 3, 4
+        voice :lead do
+          notes "c'4 d'4 e'4"
+        end
+        lyrics :lead, "sing _ -- on"
+      end
+    end
+    staff = score.staves.first
+    elements = staff.measures.first.voices[:lead].elements
+    note_points = elements.each_with_index.to_h { |note, index| [note.object_id, [100 + (index * 20), 80]] }
+    renderer = described_class.new
+    pdf = instance_double("Prawn::Document")
+    allow(pdf).to receive(:text_box)
+    allow(pdf).to receive(:stroke_line)
+
+    renderer.send(:draw_lyrics, pdf, staff, note_points, 100)
+
+    expect(pdf).to have_received(:text_box).with("sing", hash_including(size: 8, align: :center))
+    expect(pdf).to have_received(:text_box).with("on", hash_including(size: 8, align: :center))
+    expect(pdf).to have_received(:text_box).with("-", hash_including(size: 8, align: :center))
+    expect(pdf).to have_received(:stroke_line)
   end
 
   it "uses duration-specific SMuFL rest glyphs" do
