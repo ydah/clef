@@ -65,6 +65,8 @@ module Clef
 
         # @param bracket_type [Symbol]
         def staff_group(bracket_type, &block)
+          raise Error, "staff_group requires a block" unless block
+
           group = Clef::Core::StaffGroup.new([], bracket_type: bracket_type)
           evaluate_block(GroupBuilder.new(group), &block)
           score.add_staff_group(group)

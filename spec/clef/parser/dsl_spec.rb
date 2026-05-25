@@ -123,6 +123,14 @@ RSpec.describe Clef::Parser::DSL do
     expect(score.staves.first.measures.length).to eq(2)
   end
 
+  it "requires staff_group blocks" do
+    expect do
+      Clef.score do
+        staff_group :brace
+      end
+    end.to raise_error(Clef::Parser::DSL::Error, /requires a block/)
+  end
+
   it "raises clear error for invalid DSL" do
     expect do
       Clef.score do

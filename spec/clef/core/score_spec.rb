@@ -32,4 +32,18 @@ RSpec.describe Clef::Core::Score do
 
     expect { score.to_format("score.unknown") }.to raise_error(ArgumentError, /unsupported output format/)
   end
+
+  it "duplicates assigned metadata hashes" do
+    source = { prepared: true }
+    score = described_class.new(metadata: source)
+    source[:prepared] = false
+
+    expect(score.metadata[:prepared]).to be(true)
+
+    replacement = { title: "Sketch" }
+    score.metadata = replacement
+    replacement[:title] = "Changed"
+
+    expect(score.metadata[:title]).to eq("Sketch")
+  end
 end

@@ -5,7 +5,7 @@ module Clef
     class Staff
       attr_reader :id, :name, :clef, :measures
       attr_accessor :key_signature, :time_signature
-      attr_accessor :metadata
+      attr_reader :metadata
 
       # @param id [Symbol]
       # @param name [String, nil]
@@ -19,6 +19,13 @@ module Clef
         @clef = clef
         @measures = []
         @metadata = {}
+      end
+
+      # @param value [Hash]
+      def metadata=(value)
+        raise ArgumentError, "metadata must be a Hash" unless value.is_a?(Hash)
+
+        @metadata = value.dup
       end
 
       # @param measure [Measure]

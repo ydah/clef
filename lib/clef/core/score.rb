@@ -12,6 +12,13 @@ module Clef
         @metadata = metadata.dup
       end
 
+      # @param value [Hash]
+      def metadata=(value)
+        raise ArgumentError, "metadata must be a Hash" unless value.is_a?(Hash)
+
+        @metadata = value.dup
+      end
+
       # @param staff_group [StaffGroup]
       # @return [Score]
       def add_staff_group(staff_group)

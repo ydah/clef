@@ -3,11 +3,14 @@
 module Clef
   module Parser
     class LilypondParser
-      SUPPORTED_COMMANDS = %w[\\clef \\key \\major \\minor \\time \\tempo \\relative \\new].freeze
+      SUPPORTED_COMMANDS = %w[\\clef \\key \\major \\minor \\time \\tempo \\relative \\new \\with].freeze
+      STAFF_COMMAND = /\\new\s+(?:Staff|PianoStaff|StaffGroup)/.freeze
 
-      attr_reader :warnings
+      attr_reader :warnings, :plugins
 
-      def initialize
+      # @param plugins [Clef::Plugins::Registry]
+      def initialize(plugins: Clef.plugins)
+        @plugins = plugins
         @warnings = []
       end
 
@@ -16,32 +19,106 @@ module Clef
       def parse(input)
         cleaned = strip_comments(input)
         @warnings = unsupported_command_warnings(cleaned)
-        clef = extract_clef(cleaned)
-        key_tonic = extract_key_tonic(cleaned)
-        mode = extract_mode(cleaned)
-        time_numerator, time_denominator = extract_time(cleaned)
-        tempo_unit, tempo_bpm = extract_tempo(cleaned)
-        note_stream = extract_note_stream(cleaned)
-
-        score = Clef.score do
-          tempo beat_unit: tempo_unit, bpm: tempo_bpm if tempo_bpm
-          staff :staff1, clef: clef do
-            key key_tonic, mode
-            time time_numerator, time_denominator
-            play note_stream
-          end
-        end
-        Clef.plugins.run_hook(:on_after_parse, score)
+        score = build_score(cleaned)
+        plugins.run_hook(:on_after_parse, score)
         score
       end
 
       private
 
-      def extract_note_stream(input)
-        body = first_braced_body(input)
-        body = relativize_body(input, body) if input.match?(/\\relative\b/)
+      def build_score(input)
+        staff_blocks = extract_staff_blocks(input)
+        return build_single_staff_score(input) if staff_blocks.empty?
+
+        global_tempo_unit, global_tempo_bpm = extract_tempo(input)
+        use_staff_group = staff_group_input?(input)
+        parser = self
+        Clef.score(plugins: plugins) do
+          tempo beat_unit: global_tempo_unit, bpm: global_tempo_bpm if global_tempo_bpm
+          if use_staff_group
+            staff_group :bracket do
+              staff_blocks.each_with_index { |block, index| parser.send(:build_staff_from_block, self, block, index) }
+            end
+          else
+            staff_blocks.each_with_index { |block, index| parser.send(:build_staff_from_block, self, block, index) }
+          end
+        end
+      end
+
+      def build_single_staff_score(input)
+        clef = extract_clef(input)
+        key_tonic = extract_key_tonic(input)
+        mode = extract_mode(input)
+        time_numerator, time_denominator = extract_time(input)
+        tempo_unit, tempo_bpm = extract_tempo(input)
+        voice_streams = extract_voice_streams(first_braced_body(input), context: input)
+
+        Clef.score(plugins: plugins) do
+          tempo beat_unit: tempo_unit, bpm: tempo_bpm if tempo_bpm
+          staff :staff1, clef: clef do
+            key key_tonic, mode
+            time time_numerator, time_denominator
+            voice_streams.each_with_index do |stream, index|
+              voice(index.zero? ? :default : :"voice#{index + 1}") { notes stream }
+            end
+          end
+        end
+      end
+
+      def build_staff_from_block(builder, block, index)
+        context = "#{block[:header]}\n#{block[:body]}"
+        clef = extract_clef(context)
+        key_tonic = extract_key_tonic(context)
+        mode = extract_mode(context)
+        time_numerator, time_denominator = extract_time(context)
+        voice_streams = extract_voice_streams(block[:body], context: context)
+        staff_id = :"staff#{index + 1}"
+
+        builder.staff staff_id, clef: clef do
+          key key_tonic, mode
+          time time_numerator, time_denominator
+          voice_streams.each_with_index do |stream, voice_index|
+            voice(voice_index.zero? ? :default : :"voice#{voice_index + 1}") { notes stream }
+          end
+        end
+      end
+
+      def extract_staff_blocks(input)
+        blocks = []
+        scanner_index = 0
+        while (match = input.match(STAFF_COMMAND, scanner_index))
+          command_start = match.begin(0)
+          brace_start = input.index("{", match.end(0))
+          break unless brace_start
+
+          body, body_end = braced_body_at(input, brace_start)
+          header = input[command_start...brace_start]
+          blocks << { header: header, body: body }
+          scanner_index = body_end + 1
+        end
+        blocks
+      end
+
+      def staff_group_input?(input)
+        input.match?(/\\new\s+(?:StaffGroup|PianoStaff)\b/) || input.include?("<<")
+      end
+
+      def extract_voice_streams(body, context: body)
+        simultaneous = first_simultaneous_body(body)
+        streams = if simultaneous
+                    braced_bodies(simultaneous)
+                  elsif (inner = braced_bodies(body).first)
+                    [inner]
+                  else
+                    [body]
+                  end
+        streams.map { |stream| note_stream(stream, context: context) }.reject(&:empty?)
+      end
+
+      def note_stream(input, context:)
+        body = context.match?(/\\relative\b/) ? relativize_body(context, input) : input
         tokens = LilypondLexer.new.tokenize(body)
-        tokens.select { |token| token.match?(/\A<|\A[a-g]|\Ar|\A\|/) }.join(" ")
+        tokens.select { |token| token.match?(/\A<|\A[a-g]|\Ar|\A\||\A[()~\[\]]|\A(?:--|->|-\.)\z/) }.join(" ")
       end
 
       def extract_key_tonic(input)
@@ -64,7 +141,11 @@ module Clef
 
       def extract_clef(input)
         match = /\\clef\s+"?([a-z_]+)"?/.match(input)
-        (match && match[1]&.to_sym) || :treble
+        clef = (match && match[1]&.to_sym) || :treble
+        return clef if Clef::Core::Clef::TYPES.include?(clef)
+
+        warnings << "unsupported clef ignored: #{clef}"
+        :treble
       end
 
       def extract_tempo(input)
@@ -90,17 +171,49 @@ module Clef
         start_index = input.index("{")
         return "" unless start_index
 
+        braced_body_at(input, start_index).first
+      end
+
+      def braced_body_at(input, start_index)
         depth = 0
         index = start_index
         while index < input.length
           char = input[index]
           depth += 1 if char == "{"
           depth -= 1 if char == "}"
-          return input[(start_index + 1)...index] if depth.zero?
+          return [input[(start_index + 1)...index], index] if depth.zero?
 
           index += 1
         end
-        ""
+        ["", input.length]
+      end
+
+      def first_simultaneous_body(input)
+        start_index = input.index("<<")
+        return nil unless start_index
+
+        depth = 0
+        index = start_index
+        while index < input.length - 1
+          token = input[index, 2]
+          depth += 1 if token == "<<"
+          depth -= 1 if token == ">>"
+          return input[(start_index + 2)...index] if depth.zero?
+
+          index += 1
+        end
+        nil
+      end
+
+      def braced_bodies(input)
+        bodies = []
+        scanner_index = 0
+        while (brace_start = input.index("{", scanner_index))
+          body, body_end = braced_body_at(input, brace_start)
+          bodies << body
+          scanner_index = body_end + 1
+        end
+        bodies
       end
 
       def relativize_body(input, body)

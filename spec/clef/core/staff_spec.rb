@@ -8,4 +8,13 @@ RSpec.describe Clef::Core::Staff do
 
     expect(staff.measures.map(&:number)).to eq([1, 2])
   end
+
+  it "duplicates assigned metadata hashes" do
+    source = { instrument: "Piano" }
+    staff = described_class.new(:piano)
+    staff.metadata = source
+    source[:instrument] = "Violin"
+
+    expect(staff.metadata[:instrument]).to eq("Piano")
+  end
 end
